@@ -2,6 +2,7 @@ local _G = _G
 _G.RENovateNamespace = {}
 local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
+local LAD = LibStub("LibArtifactData-1.0")
 
 --GLOBALS: PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS
 local string, tostring, abs, format, tsort, hooksecurefunc, strcmputf8i, select, pairs = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.hooksecurefunc, _G.strcmputf8i, _G.select, _G.pairs
@@ -23,6 +24,7 @@ function RE:OnEvent(self, event, name)
   		_G.RENovateSettings = {["IgnoredMissions"] = {}}
   	end
 		RE.Settings = _G.RENovateSettings
+    LAD:ForceUpdate()
 
     RE.MissionList = _G.OrderHallMissionFrame.MissionTab.MissionList
     RE.OriginalUpdate = RE.MissionList.Update
