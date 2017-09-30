@@ -1,8 +1,8 @@
 ﻿# RENovate
 
-[Curse]()
+[Curse](https://mods.curse.com/addons/wow/279079-renovate-order-hall-extension)
 
-[WoWInterface]()
+[WoWInterface](http://www.wowinterface.com/downloads/info24477-RENovate-OrderHallExtension.html)
 
 ## COPYRIGHT
 
