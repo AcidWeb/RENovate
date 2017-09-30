@@ -17,18 +17,35 @@ end
 
 function RE:OnEvent(self, event, name)
   if event == "ADDON_LOADED" and name == "RENovate" then
-    local missionList = _G.OrderHallMissionFrame.MissionTab.MissionList
-    local originalUpdate = missionList.Update
+    if not _G.RENovateSettings then
+  		_G.RENovateSettings = {["IgnoredMissions"] = {}}
+  	end
+		RE.Settings = _G.RENovateSettings
+
+    RE.MissionList = _G.OrderHallMissionFrame.MissionTab.MissionList
+    RE.OriginalUpdate = RE.MissionList.Update
+    hooksecurefunc("Garrison_SortMissions", RE.MissionSort)
 
     ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
     ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
 
-    hooksecurefunc("Garrison_SortMissions", RE.MissionSort)
-
-    function missionList:Update()
-      originalUpdate(self)
+    function RE.MissionList:Update()
+      RE.OriginalUpdate(self)
       RE:MissionUpdate(self)
     end
+  end
+end
+
+function RE:OnClick(button)
+  if button == "RightButton" and not RE.MissionList.showInProgress then
+    if RE.Settings.IgnoredMissions[self.info.missionID] then
+      RE.Settings.IgnoredMissions[self.info.missionID] = nil
+    else
+      RE.Settings.IgnoredMissions[self.info.missionID] = true
+    end
+    RE.MissionList:UpdateMissions()
+  else
+    _G.GarrisonMissionButton_OnClick(self, button)
   end
 end
 
@@ -57,16 +74,32 @@ function RE:MissionUpdate(self)
     if index <= #missions then
       local mission = missions[index]
 
-      if not mission.inProgress and mission.offerEndTime then
-        local originalText = string.format(PARENS_TEMPLATE, (mission.durationSeconds < GARRISON_LONG_MISSION_TIME) and mission.duration or string.format(GARRISON_LONG_MISSION_TIME_FORMAT, mission.duration))
-        local timeRemaining = mission.offerEndTime - GetTime()
-        local colorCode, colorCodeEnd = "", ""
-        if timeRemaining < 8 * 3600 then
-          colorCode, colorCodeEnd = RED_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE
-        elseif timeRemaining < 24 * 3600 then
-          colorCode, colorCodeEnd = YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE
+      if not button.renovate then
+        button.renovate = true
+        button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        button:SetScript("OnClick", RE.OnClick)
+      end
+
+      if not mission.inProgress then
+        if RE.Settings.IgnoredMissions[mission.missionID] then
+          button.Overlay.Overlay:SetColorTexture(0, 0, 0, 0.8)
+          button.Overlay:Show();
+        else
+          button.Overlay.Overlay:SetColorTexture(0, 0, 0, 0.4)
+          button.Overlay:Hide();
         end
-        button.Summary:SetText(originalText.." ("..colorCode..mission.offerTimeRemaining..colorCodeEnd..")")
+
+        if mission.offerEndTime then
+          local originalText = string.format(PARENS_TEMPLATE, (mission.durationSeconds < GARRISON_LONG_MISSION_TIME) and mission.duration or string.format(GARRISON_LONG_MISSION_TIME_FORMAT, mission.duration))
+          local timeRemaining = mission.offerEndTime - GetTime()
+          local colorCode, colorCodeEnd = "", ""
+          if timeRemaining < 8 * 3600 then
+            colorCode, colorCodeEnd = RED_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE
+          elseif timeRemaining < 24 * 3600 then
+            colorCode, colorCodeEnd = YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE
+          end
+          button.Summary:SetText(originalText.." ("..colorCode..mission.offerTimeRemaining..colorCodeEnd..")")
+        end
       end
 
       button.Level:ClearAllPoints()
@@ -110,9 +143,14 @@ function RE:MissionUpdate(self)
 end
 
 function RE:MissionSort()
-    local missionList = _G.OrderHallMissionFrame.MissionTab.MissionList
-    if not missionList:IsVisible() or missionList.showInProgress then return end
-  	tsort(missionList.availableMissions, function (mission1, mission2)
+    if not RE.MissionList:IsVisible() or RE.MissionList.showInProgress then return end
+  	tsort(RE.MissionList.availableMissions, function (mission1, mission2)
+      if RE.Settings.IgnoredMissions[mission1.missionID] and not RE.Settings.IgnoredMissions[mission2.missionID] then
+        return false
+      elseif RE.Settings.IgnoredMissions[mission2.missionID] and not RE.Settings.IgnoredMissions[mission1.missionID] then
+        return true
+      end
+
       if mission1.isRare ~= mission2.isRare then
       	return mission1.isRare
       end

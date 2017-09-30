@@ -5,6 +5,7 @@
 ## Author: AcidWeb
 ## LoadWith: Blizzard_OrderHallUI
 ## LoadOnDemand: 1
+## SavedVariablesPerCharacter: RENovateSettings
 
 Embeds.xml
 RENovate.xml
