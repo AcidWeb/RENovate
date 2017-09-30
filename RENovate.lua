@@ -81,7 +81,7 @@ function RE:GetMissionThreats(missionID, parentFrame)
   end
   for i = 1, #enemies do
      local enemy = enemies[i]
-     for mechanicID, mechanic in pairs(enemy.mechanics) do
+     for mechanicID, _ in pairs(enemy.mechanics) do
        numThreats = numThreats + 1
        local threatFrame = parentFrame.threat[numThreats]
        local ability = f.abilityCountersForMechanicTypes[mechanicID]
@@ -93,13 +93,31 @@ function RE:GetMissionThreats(missionID, parentFrame)
    end
 end
 
+function RE:GetMissonSlowdown(missionID)
+  local enemies = select(8, GetMissionInfo(missionID))
+  local slowicons = " "
+  for i = 1, #enemies do
+     local enemy = enemies[i]
+     for _, mechanic in pairs(enemy.mechanics) do
+       if mechanic.ability and mechanic.ability.id == 428 then
+         slowicons = slowicons.."|TInterface\\Garrison\\orderhall-missions-mechanic5:0|t"
+       end
+     end
+  end
+  if #slowicons == 1 then
+    return ""
+  else
+    return slowicons
+  end
+end
+
 function RE:ShortValue(v)
 	if abs(v) >= 1e9 then
-		return format("%.1fG", v / 1e9)
+		return format("%.2fG", v / 1e9)
 	elseif abs(v) >= 1e6 then
-		return format("%.1fM", v / 1e6)
+		return format("%.0fM", v / 1e6)
 	elseif abs(v) >= 1e3 then
-		return format("%.1fk", v / 1e3)
+		return format("%.0fk", v / 1e3)
 	else
 		return format("%d", v)
 	end
@@ -111,6 +129,7 @@ function RE:MissionUpdate(self)
   local missions = self.showInProgress and self.inProgressMissions or self.availableMissions
 	local buttons = self.listScroll.buttons
 	local offset = HybridScrollFrame_GetOffset(self.listScroll)
+  local anchors = {"LEFT", "CENTER", "RIGHT"}
 
   for i = 1, #buttons do
     local button = buttons[i]
@@ -132,9 +151,9 @@ function RE:MissionUpdate(self)
         button.threats.threat = {[1] = CreateFrame("Frame", nil, button.threats, "GarrisonAbilityCounterWithCheckTemplate"),
                                  [2] = CreateFrame("Frame", nil, button.threats, "GarrisonAbilityCounterWithCheckTemplate"),
                                  [3] = CreateFrame("Frame", nil, button.threats, "GarrisonAbilityCounterWithCheckTemplate")}
-        button.threats.threat[1]:SetPoint("LEFT")
-        button.threats.threat[2]:SetPoint("CENTER")
-        button.threats.threat[3]:SetPoint("RIGHT")
+        for i = 1, 3 do
+         button.threats.threat[i]:SetPoint(anchors[i])
+        end
       end
 
       if not mission.inProgress then
@@ -149,8 +168,8 @@ function RE:MissionUpdate(self)
           button.threats:Show()
         end
 
+        local originalText = (mission.durationSeconds < GARRISON_LONG_MISSION_TIME) and mission.duration or string.format(GARRISON_LONG_MISSION_TIME_FORMAT, mission.duration)
         if mission.offerEndTime then
-          local originalText = string.format(PARENS_TEMPLATE, (mission.durationSeconds < GARRISON_LONG_MISSION_TIME) and mission.duration or string.format(GARRISON_LONG_MISSION_TIME_FORMAT, mission.duration))
           local timeRemaining = mission.offerEndTime - GetTime()
           local colorCode, colorCodeEnd = "", ""
           if timeRemaining < 8 * 3600 then
@@ -158,10 +177,14 @@ function RE:MissionUpdate(self)
           elseif timeRemaining < 24 * 3600 then
             colorCode, colorCodeEnd = YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE
           end
-          button.Summary:SetText(originalText.." ("..colorCode..mission.offerTimeRemaining..colorCodeEnd..")")
+          button.Summary:SetText(originalText..RE:GetMissonSlowdown(mission.missionID).." / "..colorCode..mission.offerTimeRemaining..colorCodeEnd)
+        else
+          button.Summary:SetText(originalText..RE:GetMissonSlowdown(mission.missionID))
         end
       end
 
+      button.Summary:ClearAllPoints()
+      button.Summary:SetPoint("BOTTOMLEFT", button.Title, "BOTTOMRIGHT", 5, 3)
       button.Level:ClearAllPoints()
       button.Level:SetPoint("CENTER", button, "TOPLEFT", 42, -32)
       button.RareText:Hide()
