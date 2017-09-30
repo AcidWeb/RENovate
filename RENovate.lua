@@ -4,9 +4,11 @@ local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
 
 --GLOBALS: PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS
-local string, tostring, abs, format, tsort, hooksecurefunc, strcmputf8i = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.hooksecurefunc, _G.strcmputf8i
+local string, tostring, abs, format, tsort, hooksecurefunc, strcmputf8i, select, pairs = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.hooksecurefunc, _G.strcmputf8i, _G.select, _G.pairs
 local GetTime = _G.GetTime
 local CreateFrame = _G.CreateFrame
+local GetMissionInfo = _G.C_Garrison.GetMissionInfo
+local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
 local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 
 RE.Version = 100
@@ -24,7 +26,8 @@ function RE:OnEvent(self, event, name)
 
     RE.MissionList = _G.OrderHallMissionFrame.MissionTab.MissionList
     RE.OriginalUpdate = RE.MissionList.Update
-    hooksecurefunc("Garrison_SortMissions", RE.MissionSort)
+    RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
+    RE.OriginalSort = _G.Garrison_SortMissions
 
     ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
     ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
@@ -32,6 +35,20 @@ function RE:OnEvent(self, event, name)
     function RE.MissionList:Update()
       RE.OriginalUpdate(self)
       RE:MissionUpdate(self)
+    end
+
+    function _G.GarrisonMissionList_UpdateMouseOverTooltip(self)
+      if not _G.OrderHallMissionFrame:IsShown() then
+        RE.OriginalTooltip(self)
+      end
+    end
+
+    function _G.Garrison_SortMissions(missionsList)
+      if not _G.OrderHallMissionFrame:IsShown() then
+        RE.OriginalSort(missionsList)
+      else
+        RE.MissionSort()
+      end
     end
   end
 end
@@ -49,6 +66,33 @@ function RE:OnClick(button)
   end
 end
 
+function RE:GetMissionThreats(missionID, parentFrame)
+  local f = _G.OrderHallMissionFrame
+  if not f.abilityCountersForMechanicTypes then
+    f.abilityCountersForMechanicTypes = GetFollowerAbilityCountersForMechanicTypes(f.followerTypeID)
+  end
+
+  local enemies = select(8, GetMissionInfo(missionID))
+  local counterableThreats = _G.GarrisonMission_DetermineCounterableThreats(missionID, f.followerTypeID)
+  local numThreats = 0
+
+  for i = 1, 3 do
+    parentFrame.threat[i]:Hide()
+  end
+  for i = 1, #enemies do
+     local enemy = enemies[i]
+     for mechanicID, mechanic in pairs(enemy.mechanics) do
+       numThreats = numThreats + 1
+       local threatFrame = parentFrame.threat[numThreats]
+       local ability = f.abilityCountersForMechanicTypes[mechanicID]
+       threatFrame.Border:SetShown(_G.ShouldShowFollowerAbilityBorder(f.followerTypeID, ability))
+       threatFrame.Icon:SetTexture(ability.icon)
+       threatFrame:Show()
+       _G.GarrisonMissionButton_CheckTooltipThreat(threatFrame, missionID, mechanicID, counterableThreats)
+     end
+   end
+end
+
 function RE:ShortValue(v)
 	if abs(v) >= 1e9 then
 		return format("%.1fG", v / 1e9)
@@ -62,7 +106,7 @@ function RE:ShortValue(v)
 end
 
 function RE:MissionUpdate(self)
-  if not self or not self:IsShown() then return end
+  if not _G.OrderHallMissionFrame or not _G.OrderHallMissionFrame:IsShown() then return end
 
   local missions = self.showInProgress and self.inProgressMissions or self.availableMissions
 	local buttons = self.listScroll.buttons
@@ -78,15 +122,31 @@ function RE:MissionUpdate(self)
         button.renovate = true
         button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         button:SetScript("OnClick", RE.OnClick)
+        button:SetScript("OnEnter", nil)
+        button:SetScript("OnLeave", nil)
+        if _G.ElvUI then _G.ElvUI[1]:GetModule('Skins'):HandleButton(button) end
+        button.threats = CreateFrame("Frame", nil, button)
+        button.threats:SetPoint("RIGHT", button, "RIGHT", -145, 0)
+        button.threats:SetWidth(80)
+        button.threats:SetHeight(30)
+        button.threats.threat = {[1] = CreateFrame("Frame", nil, button.threats, "GarrisonAbilityCounterWithCheckTemplate"),
+                                 [2] = CreateFrame("Frame", nil, button.threats, "GarrisonAbilityCounterWithCheckTemplate"),
+                                 [3] = CreateFrame("Frame", nil, button.threats, "GarrisonAbilityCounterWithCheckTemplate")}
+        button.threats.threat[1]:SetPoint("LEFT")
+        button.threats.threat[2]:SetPoint("CENTER")
+        button.threats.threat[3]:SetPoint("RIGHT")
       end
 
       if not mission.inProgress then
         if RE.Settings.IgnoredMissions[mission.missionID] then
           button.Overlay.Overlay:SetColorTexture(0, 0, 0, 0.8)
-          button.Overlay:Show();
+          button.Overlay:Show()
+          button.threats:Hide()
         else
           button.Overlay.Overlay:SetColorTexture(0, 0, 0, 0.4)
-          button.Overlay:Hide();
+          button.Overlay:Hide()
+          RE:GetMissionThreats(mission.missionID, button.threats)
+          button.threats:Show()
         end
 
         if mission.offerEndTime then
@@ -109,7 +169,6 @@ function RE:MissionUpdate(self)
         button.Level:SetText(mission.iLevel)
         button.ItemLevel:SetText(ITEM_LEVEL_ABBR)
       end
-
       if mission.isRare then
         button.Level:SetTextColor(0.098, 0.537, 0.969, 1.0)
         button.ItemLevel:SetTextColor(0.098, 0.537, 0.969, 1.0)
@@ -143,7 +202,6 @@ function RE:MissionUpdate(self)
 end
 
 function RE:MissionSort()
-    if not RE.MissionList:IsVisible() or RE.MissionList.showInProgress then return end
   	tsort(RE.MissionList.availableMissions, function (mission1, mission2)
       if RE.Settings.IgnoredMissions[mission1.missionID] and not RE.Settings.IgnoredMissions[mission2.missionID] then
         return false
