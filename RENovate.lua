@@ -4,13 +4,14 @@ local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
 local LAD = LibStub("LibArtifactData-1.0")
 
---GLOBALS: PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS
+--GLOBALS: PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, Fancy18Font, Game13Font
 local string, tostring, abs, format, tsort, hooksecurefunc, strcmputf8i, select, pairs = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.hooksecurefunc, _G.strcmputf8i, _G.select, _G.pairs
 local GetTime = _G.GetTime
 local CreateFrame = _G.CreateFrame
 local GetMissionInfo = _G.C_Garrison.GetMissionInfo
 local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
 local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
+local ElvUI = _G.ElvUI
 
 RE.Version = 100
 
@@ -145,7 +146,12 @@ function RE:MissionUpdate(self)
         button:SetScript("OnClick", RE.OnClick)
         button:SetScript("OnEnter", nil)
         button:SetScript("OnLeave", nil)
-        if _G.ElvUI then _G.ElvUI[1]:GetModule('Skins'):HandleButton(button) end
+        if ElvUI then
+          ElvUI[1]:GetModule('Skins'):HandleButton(button)
+        else
+          button.Title:SetFontObject(Fancy18Font)
+          button.Summary:SetFontObject(Game13Font)
+        end
         button.threats = CreateFrame("Frame", nil, button)
         button.threats:SetPoint("RIGHT", button, "RIGHT", -145, 0)
         button.threats:SetWidth(80)
@@ -186,7 +192,11 @@ function RE:MissionUpdate(self)
       end
 
       button.Summary:ClearAllPoints()
-      button.Summary:SetPoint("BOTTOMLEFT", button.Title, "BOTTOMRIGHT", 5, 3)
+      if ElvUI then
+        button.Summary:SetPoint("BOTTOMLEFT", button.Title, "BOTTOMRIGHT", 5, 3)
+      else
+        button.Summary:SetPoint("BOTTOMLEFT", button.Title, "BOTTOMRIGHT", 5, 1)
+      end
       button.Level:ClearAllPoints()
       button.Level:SetPoint("CENTER", button, "TOPLEFT", 42, -32)
       button.RareText:Hide()
