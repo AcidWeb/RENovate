@@ -4,7 +4,7 @@ local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
 
 --GLOBALS: PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS
-local string, tostring, abs, format = _G.string, _G.tostring, _G.abs, _G.format
+local string, tostring, abs, format, tsort, hooksecurefunc, strcmputf8i = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.hooksecurefunc, _G.strcmputf8i
 local GetTime = _G.GetTime
 local CreateFrame = _G.CreateFrame
 local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
@@ -22,6 +22,8 @@ function RE:OnEvent(self, event, name)
 
     ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
     ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
+
+    hooksecurefunc("Garrison_SortMissions", RE.MissionSort)
 
     function missionList:Update()
       originalUpdate(self)
@@ -105,4 +107,30 @@ function RE:MissionUpdate(self)
       end
     end
   end
+end
+
+function RE:MissionSort()
+    local missionList = _G.OrderHallMissionFrame.MissionTab.MissionList
+    if not missionList:IsVisible() or missionList.showInProgress then return end
+  	tsort(missionList.availableMissions, function (mission1, mission2)
+      if mission1.isRare ~= mission2.isRare then
+      	return mission1.isRare
+      end
+
+      if mission1.level ~= mission2.level then
+      	return mission1.level > mission2.level
+      end
+
+      if mission1.isMaxLevel then
+      	if mission1.iLevel ~= mission2.iLevel then
+      		return mission1.iLevel > mission2.iLevel
+      	end
+      end
+
+      if mission1.durationSeconds ~= mission2.durationSeconds then
+      	return mission1.durationSeconds < mission2.durationSeconds
+      end
+
+      return strcmputf8i(mission1.name, mission2.name) < 0
+    end)
 end
