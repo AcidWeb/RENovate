@@ -4,8 +4,8 @@ local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
 local LAD = LibStub("LibArtifactData-1.0")
 
---GLOBALS: PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, Fancy18Font, Game13Font
-local string, tostring, abs, format, tsort, strcmputf8i, select, pairs = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs
+--GLOBALS: PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, Fancy18Font, Game13Font
+local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc
 local GetTime = _G.GetTime
 local CreateFrame = _G.CreateFrame
 local GetMissionInfo = _G.C_Garrison.GetMissionInfo
@@ -13,7 +13,10 @@ local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbil
 local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local ElvUI = _G.ElvUI
 
-RE.Version = 100
+RE.Version = 110
+RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
+RE.RewardCache = {}
+RE.UpdateTimer = -1
 
 function RE:OnLoad(self)
 	self:RegisterEvent("ADDON_LOADED")
@@ -36,17 +39,48 @@ function RE:OnEvent(self, event, name)
     ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
     ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
 
-    function RE.MissionList:Update()
-      RE.OriginalUpdate(self)
-      RE:MissionUpdate(self)
-    end
+		-- Force refresh of "In Progress" tab when needed
+		hooksecurefunc("GarrisonMissionListTab_SetTab", function() RE.UpdateTimer = 0 end)
+		RE.MissionList:HookScript("OnHide", function() RE.UpdateTimer = 0 end)
 
+		-- Replaced original OnUpdate to implement throttling and "In Progress" sorting
+		RE.MissionList:SetScript("OnUpdate", function (self, elapsed)
+			if RE.UpdateTimer < 0 then
+				if self.showInProgress then
+					_G.C_Garrison.GetInProgressMissions(self.inProgressMissions, RE.F.followerTypeID)
+					RE.MissionSortInProgress()
+					self.Tab2:SetText(WINTERGRASP_IN_PROGRESS.." - "..#self.inProgressMissions)
+					self:Update()
+				else
+					local timeNow = GetTime()
+					for i = 1, #self.availableMissions do
+						if self.availableMissions[i].offerEndTime and self.availableMissions[i].offerEndTime <= timeNow then
+							self:UpdateMissions()
+							break
+						end
+					end
+				end
+				self:UpdateCombatAllyMission()
+				RE.UpdateTimer = 10
+			else
+				RE.UpdateTimer = RE.UpdateTimer - elapsed
+			end
+    end)
+
+		-- Pre-hook to inject button skinning function
+		function RE.MissionList:Update()
+			RE.OriginalUpdate(self)
+			RE:MissionUpdate(self)
+		end
+
+		-- Pre-hook to disable tooltips in Order Hall mission table
     function _G.GarrisonMissionList_UpdateMouseOverTooltip(self)
       if not RE.F:IsShown() then
         RE.OriginalTooltip(self)
       end
     end
 
+		-- Pre-hook to inject available missions sorting function
     function _G.Garrison_SortMissions(missionsList)
       if not RE.F:IsShown() then
         RE.OriginalSort(missionsList)
@@ -80,13 +114,13 @@ function RE:GetMissionThreats(missionID, parentFrame)
   local numThreats = 0
 
   for i = 1, 3 do
-    parentFrame.threat[i]:Hide()
+    parentFrame.Threat[i]:Hide()
   end
   for i = 1, #enemies do
      local enemy = enemies[i]
      for mechanicID, _ in pairs(enemy.mechanics) do
        numThreats = numThreats + 1
-       local threatFrame = parentFrame.threat[numThreats]
+       local threatFrame = parentFrame.Threat[numThreats]
        local ability = RE.F.abilityCountersForMechanicTypes[mechanicID]
        threatFrame.Border:SetShown(_G.ShouldShowFollowerAbilityBorder(RE.F.followerTypeID, ability))
        threatFrame.Icon:SetTexture(ability.icon)
@@ -114,6 +148,24 @@ function RE:GetMissonSlowdown(missionID)
   end
 end
 
+function RE:GetRewardCache(mission)
+	if not RE.RewardCache[mission.missionID] then
+		local allRewards = {}
+		if mission.overmaxRewards then
+			for j = 1, #mission.overmaxRewards do
+				allRewards[#allRewards + 1] = mission.overmaxRewards[j]
+			end
+		end
+		if mission.rewards then
+			for j = 1, #mission.rewards do
+				allRewards[#allRewards + 1] = mission.rewards[j]
+			end
+		end
+		RE.RewardCache[mission.missionID] = allRewards
+	end
+	return RE.RewardCache[mission.missionID]
+end
+
 function RE:ShortValue(v)
 	if abs(v) >= 1e9 then
 		return format("%.2fG", v / 1e9)
@@ -132,7 +184,6 @@ function RE:MissionUpdate(self)
   local missions = self.showInProgress and self.inProgressMissions or self.availableMissions
 	local buttons = self.listScroll.buttons
 	local offset = HybridScrollFrame_GetOffset(self.listScroll)
-  local anchors = {"LEFT", "CENTER", "RIGHT"}
 
   for i = 1, #buttons do
     local button = buttons[i]
@@ -140,8 +191,8 @@ function RE:MissionUpdate(self)
     if index <= #missions then
       local mission = missions[index]
 
-      if not button.renovate then
-        button.renovate = true
+      if not button.Renovate then
+        button.Renovate = true
         button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         button:SetScript("OnClick", RE.OnClick)
         button:SetScript("OnEnter", nil)
@@ -152,15 +203,15 @@ function RE:MissionUpdate(self)
           button.Title:SetFontObject(Fancy18Font)
           button.Summary:SetFontObject(Game13Font)
         end
-        button.threats = CreateFrame("Frame", nil, button)
-        button.threats:SetPoint("RIGHT", button, "RIGHT", -145, 0)
-        button.threats:SetWidth(80)
-        button.threats:SetHeight(30)
-        button.threats.threat = {[1] = CreateFrame("Frame", nil, button.threats, "GarrisonAbilityCounterWithCheckTemplate"),
-                                 [2] = CreateFrame("Frame", nil, button.threats, "GarrisonAbilityCounterWithCheckTemplate"),
-                                 [3] = CreateFrame("Frame", nil, button.threats, "GarrisonAbilityCounterWithCheckTemplate")}
+        button.Threats = CreateFrame("Frame", nil, button)
+        button.Threats:SetPoint("RIGHT", button, "RIGHT", -145, 0)
+        button.Threats:SetWidth(80)
+        button.Threats:SetHeight(30)
+        button.Threats.Threat = {[1] = CreateFrame("Frame", nil, button.Threats, "GarrisonAbilityCounterWithCheckTemplate"),
+                                 [2] = CreateFrame("Frame", nil, button.Threats, "GarrisonAbilityCounterWithCheckTemplate"),
+                                 [3] = CreateFrame("Frame", nil, button.Threats, "GarrisonAbilityCounterWithCheckTemplate")}
         for i = 1, 3 do
-         button.threats.threat[i]:SetPoint(anchors[i])
+         button.Threats.Threat[i]:SetPoint(RE.ThreatAnchors[i])
         end
       end
 
@@ -168,12 +219,12 @@ function RE:MissionUpdate(self)
         if RE.Settings.IgnoredMissions[mission.missionID] then
           button.Overlay.Overlay:SetColorTexture(0, 0, 0, 0.8)
           button.Overlay:Show()
-          button.threats:Hide()
+          button.Threats:Hide()
         else
           button.Overlay.Overlay:SetColorTexture(0, 0, 0, 0.4)
           button.Overlay:Hide()
-          RE:GetMissionThreats(mission.missionID, button.threats)
-          button.threats:Show()
+          RE:GetMissionThreats(mission.missionID, button.Threats)
+          button.Threats:Show()
         end
 
         local originalText = (mission.durationSeconds < GARRISON_LONG_MISSION_TIME) and mission.duration or string.format(GARRISON_LONG_MISSION_TIME_FORMAT, mission.duration)
@@ -192,7 +243,7 @@ function RE:MissionUpdate(self)
       else
         button.Overlay.Overlay:SetColorTexture(0, 0, 0, 0.4)
         button.Overlay:Show()
-        button.threats:Hide()
+        button.Threats:Hide()
       end
 
       button.Summary:ClearAllPoints()
@@ -216,18 +267,8 @@ function RE:MissionUpdate(self)
         button.ItemLevel:SetTextColor(0.84, 0.72, 0.57, 1.0)
       end
 
-      local allRewards = {}
-      if mission.overmaxRewards then
-        for j = 1, #mission.overmaxRewards do
-          allRewards[#allRewards + 1] = mission.overmaxRewards[j]
-        end
-      end
-      if mission.rewards then
-        for j = 1, #mission.rewards do
-          allRewards[#allRewards + 1] = mission.rewards[j]
-        end
-      end
-      _G.GarrisonMissionButton_SetRewards(button, allRewards, #allRewards)
+			local rewards = RE:GetRewardCache(mission)
+      _G.GarrisonMissionButton_SetRewards(button, rewards, #rewards)
 
       for j = 1, #button.Rewards do
         local itemID = button.Rewards[j].itemID
@@ -241,31 +282,45 @@ function RE:MissionUpdate(self)
 end
 
 function RE:MissionSort()
-  	tsort(RE.MissionList.availableMissions, function (mission1, mission2)
-      if RE.Settings.IgnoredMissions[mission1.missionID] and not RE.Settings.IgnoredMissions[mission2.missionID] then
-        return false
-      elseif RE.Settings.IgnoredMissions[mission2.missionID] and not RE.Settings.IgnoredMissions[mission1.missionID] then
-        return true
-      end
+	if RE.MissionList.showInProgress then return end
 
-      if mission1.isRare ~= mission2.isRare then
-      	return mission1.isRare
-      end
+	tsort(RE.MissionList.availableMissions, function (mission1, mission2)
+    if RE.Settings.IgnoredMissions[mission1.missionID] and not RE.Settings.IgnoredMissions[mission2.missionID] then
+      return false
+    elseif RE.Settings.IgnoredMissions[mission2.missionID] and not RE.Settings.IgnoredMissions[mission1.missionID] then
+      return true
+    end
 
-      if mission1.level ~= mission2.level then
-      	return mission1.level > mission2.level
-      end
+    if mission1.isRare ~= mission2.isRare then
+    	return mission1.isRare
+    end
 
-      if mission1.isMaxLevel then
-      	if mission1.iLevel ~= mission2.iLevel then
-      		return mission1.iLevel > mission2.iLevel
-      	end
-      end
+    if mission1.level ~= mission2.level then
+    	return mission1.level > mission2.level
+    end
 
-      if mission1.durationSeconds ~= mission2.durationSeconds then
-      	return mission1.durationSeconds < mission2.durationSeconds
-      end
+    if mission1.isMaxLevel then
+    	if mission1.iLevel ~= mission2.iLevel then
+    		return mission1.iLevel > mission2.iLevel
+    	end
+    end
 
-      return strcmputf8i(mission1.name, mission2.name) < 0
-    end)
+    if mission1.durationSeconds ~= mission2.durationSeconds then
+    	return mission1.durationSeconds < mission2.durationSeconds
+    end
+
+    return strcmputf8i(mission1.name, mission2.name) < 0
+  end)
+end
+
+function RE:MissionSortInProgress()
+	if not RE.MissionList.showInProgress then return end
+
+	tsort(RE.MissionList.inProgressMissions, function (mission1, mission2)
+    if mission1.timeLeftSeconds ~= mission2.timeLeftSeconds then
+    	return mission1.timeLeftSeconds < mission2.timeLeftSeconds
+    end
+
+    return strcmputf8i(mission1.name, mission2.name) < 0
+  end)
 end
