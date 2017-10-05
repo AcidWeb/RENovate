@@ -17,6 +17,7 @@ RE.Version = 110
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
 RE.RewardCache = {}
 RE.UpdateTimer = -1
+RE.PlayerZone = GetCVar("portal")
 
 function RE:OnLoad(self)
 	self:RegisterEvent("ADDON_LOADED")
@@ -167,14 +168,26 @@ function RE:GetRewardCache(mission)
 end
 
 function RE:ShortValue(v)
-	if abs(v) >= 1e9 then
-		return format("%.2fG", v / 1e9)
-	elseif abs(v) >= 1e6 then
-		return format("%.0fM", v / 1e6)
-	elseif abs(v) >= 1e3 then
-		return format("%.0fk", v / 1e3)
+	if RE.PlayerZone == "US" then
+		if abs(v) >= 1e9 then
+			return format("%.2fG", v / 1e9)
+		elseif abs(v) >= 1e6 then
+			return format("%.0fM", v / 1e6)
+		elseif abs(v) >= 1e3 then
+			return format("%.0fk", v / 1e3)
+		else
+			return format("%d", v)
+		end
 	else
-		return format("%d", v)
+		if abs(v) >= 1e9 then
+			return format("%.2fB", v / 1e9)
+		elseif abs(v) >= 1e6 then
+			return format("%.0fM", v / 1e6)
+		elseif abs(v) >= 1e3 then
+			return format("%.0fK", v / 1e3)
+		else
+			return format("%d", v)
+		end
 	end
 end
 
