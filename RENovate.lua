@@ -41,8 +41,8 @@ function RE:OnEvent(self, event, name)
     ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
 
 		-- Force refresh of "In Progress" tab when needed
-		hooksecurefunc("GarrisonMissionListTab_SetTab", function() RE.UpdateTimer = 0 end)
-		RE.MissionList:HookScript("OnHide", function() RE.UpdateTimer = 0 end)
+		hooksecurefunc("GarrisonMissionListTab_SetTab", function() RE.UpdateTimer = -1 end)
+		RE.MissionList:HookScript("OnHide", function() RE.UpdateTimer = -1 end)
 
 		-- Replaced original OnUpdate to implement throttling and "In Progress" sorting
 		RE.MissionList:SetScript("OnUpdate", function (self, elapsed)
