@@ -4,18 +4,26 @@ local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
 local LAD = LibStub("LibArtifactData-1.0")
 
---GLOBALS: PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, Fancy18Font, Game13Font
-local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc
+--GLOBALS: PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font
+local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print
 local GetTime = _G.GetTime
-local CreateFrame = _G.CreateFrame
 local GetMissionInfo = _G.C_Garrison.GetMissionInfo
 local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
+local GetAvailableMissions = _G.C_Garrison.GetAvailableMissions
+local GetMissionLink = _G.C_Garrison.GetMissionLink
+local GetItemInfo = _G.GetItemInfo
+local GetCurrencyLink = _G.GetCurrencyLink
+local CreateFrame = _G.CreateFrame
 local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
+local NewTicker = _G.C_Timer.NewTicker
+local PlaySound = _G.PlaySound
 local ElvUI = _G.ElvUI
 
-RE.Version = 110
+RE.Version = 120
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
 RE.RewardCache = {}
+RE.MissionCache = {}
+RE.MissionCurrentCache = {}
 RE.UpdateTimer = -1
 RE.PlayerZone = GetCVar("portal")
 
@@ -36,6 +44,12 @@ function RE:OnEvent(self, event, name)
     RE.OriginalUpdate = RE.MissionList.Update
     RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
     RE.OriginalSort = _G.Garrison_SortMissions
+
+		GetAvailableMissions(RE.MissionCache, 4)
+		for i=1, #RE.MissionCache do
+				RE.MissionCurrentCache[RE.MissionCache[i].missionID] = true
+		end
+		RE.CheckTimer = NewTicker(60, RE.CheckNewMissions)
 
     ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
     ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
@@ -189,6 +203,47 @@ function RE:ShortValue(v)
 			return format("%d", v)
 		end
 	end
+end
+
+function RE:CheckNewMissions()
+	GetAvailableMissions(RE.MissionCache, 4)
+	for i=1, #RE.MissionCache do
+	  if RE.MissionCurrentCache[RE.MissionCache[i].missionID] == nil and not RE.Settings.IgnoredMissions[RE.MissionCache[i].missionID] and not RE.F:IsShown() then
+	    RE:PrintNewMission(i)
+	  end
+	end
+end
+
+function RE:PrintNewMission(mission)
+  local ms = "|cFF74D06C[RENovate]|r |cFFFF0000"..GARRISON_MISSION_ADDED_TOAST1.."!|r - "..GetMissionLink(RE.MissionCache[mission].missionID)
+
+	local rewards = RE:GetRewardCache(RE.MissionCache[mission])
+  for i=1, #rewards do
+    local reward = rewards[i]
+    local link = ""
+    if reward.itemID and reward.itemID ~= 0 then
+      link = select(2, GetItemInfo(reward.itemID))
+      if not link then return end
+      ms = ms.."|n"..reward.quantity.."x "..link
+			if LAP:DoesItemGrantArtifactPower(reward.itemID) then
+				ms = ms.." |cFFE5CC7f"..RE:ShortValue(LAP:GetArtifactPowerGrantedByItem(reward.itemID)).." "..ARTIFACT_POWER.."|r"
+			end
+    elseif reward.currencyID then
+      if reward.currencyID ~= 0 then
+        link = GetCurrencyLink(reward.currencyID)
+        if not link then return end
+        ms = ms.."|n"..reward.quantity.."x "..link
+      else
+        ms = ms.."|n|cFFCC9900"..floor(reward.quantity / 10000).." "..BONUS_ROLL_REWARD_MONEY.."|r"
+      end
+		elseif reward.followerXP then
+				ms = ms.."|n|cFFE6CC80"..reward.followerXP.." "..XP.."|r"
+    end
+  end
+
+  PlaySound(44294)
+  print(ms)
+  RE.MissionCurrentCache[RE.MissionCache[mission].missionID] = true
 end
 
 function RE:MissionUpdate(self)
