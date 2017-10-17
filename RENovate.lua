@@ -29,6 +29,7 @@ RE.PlayerZone = GetCVar("portal")
 
 function RE:OnLoad(self)
 	self:RegisterEvent("ADDON_LOADED")
+	self:RegisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
 end
 
 function RE:OnEvent(self, event, name)
@@ -44,12 +45,6 @@ function RE:OnEvent(self, event, name)
     RE.OriginalUpdate = RE.MissionList.Update
     RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
     RE.OriginalSort = _G.Garrison_SortMissions
-
-		GetAvailableMissions(RE.MissionCache, 4)
-		for i=1, #RE.MissionCache do
-				RE.MissionCurrentCache[RE.MissionCache[i].missionID] = true
-		end
-		RE.CheckTimer = NewTicker(60, RE.CheckNewMissions)
 
     ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
     ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
@@ -103,7 +98,18 @@ function RE:OnEvent(self, event, name)
         RE.MissionSort()
       end
     end
-  end
+
+		self:UnregisterEvent("ADDON_LOADED")
+	elseif event == "GARRISON_FOLLOWER_CATEGORIES_UPDATED" then
+		GetAvailableMissions(RE.MissionCache, 4)
+		if #RE.MissionCache == 0 then return end
+		for i=1, #RE.MissionCache do
+				RE.MissionCurrentCache[RE.MissionCache[i].missionID] = true
+		end
+		RE.CheckTimer = NewTicker(60, RE.CheckNewMissions)
+
+		self:UnregisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
+	end
 end
 
 function RE:OnClick(button)
