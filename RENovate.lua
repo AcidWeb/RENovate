@@ -4,13 +4,18 @@ local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
 local LAD = LibStub("LibArtifactData-1.0")
 
---GLOBALS: PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font
-local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print
+--GLOBALS: LE_FOLLOWER_TYPE_GARRISON_7_0, PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font
+local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print, collectgarbage = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print, _G.collectgarbage
 local GetTime = _G.GetTime
 local GetMissionInfo = _G.C_Garrison.GetMissionInfo
 local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
 local GetAvailableMissions = _G.C_Garrison.GetAvailableMissions
 local GetMissionLink = _G.C_Garrison.GetMissionLink
+local GetPartyMissionInfo = _G.C_Garrison.GetPartyMissionInfo
+local GetMissionSuccessChance = _G.C_Garrison.GetMissionSuccessChance
+local GetFollowers = _G.C_Garrison.GetFollowers
+local AddFollowerToMission = _G.C_Garrison.AddFollowerToMission
+local RemoveFollowerFromMission = _G.C_Garrison.RemoveFollowerFromMission
 local GetItemInfo = _G.GetItemInfo
 local GetCurrencyLink = _G.GetCurrencyLink
 local CreateFrame = _G.CreateFrame
@@ -20,16 +25,19 @@ local PlaySound = _G.PlaySound
 local ElvUI = _G.ElvUI
 
 RE.Version = 120
+RE.ParsingInProgress = False
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
 RE.RewardCache = {}
 RE.MissionCache = {}
 RE.MissionCurrentCache = {}
+RE.FollowersChanceCache = {}
 RE.UpdateTimer = -1
 RE.PlayerZone = GetCVar("portal")
 
 function RE:OnLoad(self)
 	self:RegisterEvent("ADDON_LOADED")
 	self:RegisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
+	self:RegisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
 end
 
 function RE:OnEvent(self, event, name)
@@ -42,12 +50,16 @@ function RE:OnEvent(self, event, name)
 
     RE.F = _G.OrderHallMissionFrame
     RE.MissionList = RE.F.MissionTab.MissionList
+		RE.MissionPage = RE.F.MissionTab.MissionPage
     RE.OriginalUpdate = RE.MissionList.Update
     RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
     RE.OriginalSort = _G.Garrison_SortMissions
 
     ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
     ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
+
+		-- Refresh team data when mission is opened
+		hooksecurefunc("GarrisonMissionButton_OnClick", function() RE:OnEvent(nil, 'GARRISON_FOLLOWER_LIST_UPDATE') end)
 
 		-- Force refresh of "In Progress" tab when needed
 		hooksecurefunc("GarrisonMissionListTab_SetTab", function() RE.UpdateTimer = -1 end)
@@ -109,6 +121,11 @@ function RE:OnEvent(self, event, name)
 		RE.CheckTimer = NewTicker(60, RE.CheckNewMissions)
 
 		self:UnregisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
+	elseif event == "GARRISON_FOLLOWER_LIST_UPDATE" and RE.MissionPage:IsShown() and not RE.ParsingInProgress then
+		RE.ParsingInProgress = true
+		RE:GetTeamChances()
+		collectgarbage()
+		RE.ParsingInProgress = false
 	end
 end
 
@@ -169,6 +186,22 @@ function RE:GetMissonSlowdown(missionID)
   end
 end
 
+function RE:GetTeamChances()
+	local followers = GetFollowers(RE.F.followerTypeID)
+	local missionID = RE.MissionPage.missionInfo.missionID
+	local baseChance = GetMissionSuccessChance(missionID)
+
+	for i=1, #followers do
+		local follower = followers[i]
+		if follower.isCollected and not follower.status then
+		  AddFollowerToMission(missionID, followers[i].followerID)
+		  local chance = select(4, GetPartyMissionInfo(missionID))
+		  RE.FollowersChanceCache[follower.followerID] = chance - baseChance
+		  RemoveFollowerFromMission(missionID, followers[i].followerID)
+		end
+	end
+end
+
 function RE:GetRewardCache(mission)
 	if not RE.RewardCache[mission.missionID] then
 		local allRewards = {}
@@ -212,7 +245,7 @@ function RE:ShortValue(v)
 end
 
 function RE:CheckNewMissions()
-	GetAvailableMissions(RE.MissionCache, 4)
+	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
 	for i=1, #RE.MissionCache do
 	  if RE.MissionCurrentCache[RE.MissionCache[i].missionID] == nil and not RE.Settings.IgnoredMissions[RE.MissionCache[i].missionID] and not RE.F:IsShown() then
 	    RE:PrintNewMission(i)
