@@ -4,8 +4,8 @@ local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
 local LAD = LibStub("LibArtifactData-1.0")
 
---GLOBALS: LE_FOLLOWER_TYPE_GARRISON_7_0, PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font
-local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print, collectgarbage = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print, _G.collectgarbage
+--GLOBALS: LE_FOLLOWER_TYPE_GARRISON_7_0, PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font, Game13FontShadow
+local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetTime = _G.GetTime
 local GetMissionInfo = _G.C_Garrison.GetMissionInfo
 local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
@@ -14,6 +14,7 @@ local GetMissionLink = _G.C_Garrison.GetMissionLink
 local GetPartyMissionInfo = _G.C_Garrison.GetPartyMissionInfo
 local GetMissionSuccessChance = _G.C_Garrison.GetMissionSuccessChance
 local GetFollowers = _G.C_Garrison.GetFollowers
+local GetFollowerAbilities = _G.C_Garrison.GetFollowerAbilities
 local AddFollowerToMission = _G.C_Garrison.AddFollowerToMission
 local RemoveFollowerFromMission = _G.C_Garrison.RemoveFollowerFromMission
 local GetItemInfo = _G.GetItemInfo
@@ -34,6 +35,8 @@ RE.FollowersChanceCache = {}
 RE.UpdateTimer = -1
 RE.PlayerZone = GetCVar("portal")
 
+-- Event functions
+
 function RE:OnLoad(self)
 	self:RegisterEvent("ADDON_LOADED")
 	self:RegisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
@@ -49,9 +52,11 @@ function RE:OnEvent(self, event, name)
     LAD:ForceUpdate()
 
     RE.F = _G.OrderHallMissionFrame
+		RE.FF = _G.OrderHallMissionFrameFollowers
     RE.MissionList = RE.F.MissionTab.MissionList
 		RE.MissionPage = RE.F.MissionTab.MissionPage
     RE.OriginalUpdate = RE.MissionList.Update
+		RE.OriginalUpdateFollowers = RE.FF.UpdateData
     RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
     RE.OriginalSort = _G.Garrison_SortMissions
 
@@ -94,6 +99,10 @@ function RE:OnEvent(self, event, name)
 			RE.OriginalUpdate(self)
 			RE:MissionUpdate(self)
 		end
+		function RE.FF:UpdateData()
+			RE.OriginalUpdateFollowers(self)
+			RE:FollowerUpdate(self)
+		end
 
 		-- Pre-hook to disable tooltips in Order Hall mission table
     function _G.GarrisonMissionList_UpdateMouseOverTooltip(self)
@@ -113,7 +122,7 @@ function RE:OnEvent(self, event, name)
 
 		self:UnregisterEvent("ADDON_LOADED")
 	elseif event == "GARRISON_FOLLOWER_CATEGORIES_UPDATED" then
-		GetAvailableMissions(RE.MissionCache, 4)
+		GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
 		if #RE.MissionCache == 0 then return end
 		for i=1, #RE.MissionCache do
 				RE.MissionCurrentCache[RE.MissionCache[i].missionID] = true
@@ -123,7 +132,7 @@ function RE:OnEvent(self, event, name)
 		self:UnregisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
 	elseif event == "GARRISON_FOLLOWER_LIST_UPDATE" and RE.MissionPage:IsShown() and not RE.ParsingInProgress then
 		RE.ParsingInProgress = true
-		RE:GetTeamChances()
+		RE:GetMissionChance()
 		collectgarbage()
 		RE.ParsingInProgress = false
 	end
@@ -141,6 +150,8 @@ function RE:OnClick(button)
     _G.GarrisonMissionButton_OnClick(self, button)
   end
 end
+
+-- Mission functions
 
 function RE:GetMissionThreats(missionID, parentFrame)
   if not RE.F.abilityCountersForMechanicTypes then
@@ -168,6 +179,42 @@ function RE:GetMissionThreats(missionID, parentFrame)
    end
 end
 
+function RE:GetMissionCounteredThreats(followersOrg, enemies, newFollower)
+	local followers = RE:CopyTable(followersOrg)
+	local alreadyCountered = {[1] = {}, [2] = {}, [3] = {}, [4] = {}, [5] = {}}
+	local countered = 0
+
+	if newFollower then
+		for i=1, #followers do
+			if not followers[i].info then
+				followers[i].info = newFollower
+				break
+			end
+		end
+	end
+
+	for i = 1, #followers do
+		local follower = followers[i]
+		if follower.info then
+		  local abilities = GetFollowerAbilities(follower.info.followerID)
+		  for a = 1, #abilities do
+		    for counterID, _ in pairs(abilities[a].counters) do
+		      for i = 1, #enemies do
+	          local enemy = enemies[i]
+	      		for mechanicIndex = 1, #enemy.Mechanics do
+	      			if counterID == enemy.Mechanics[mechanicIndex].mechanicID and not alreadyCountered[i][mechanicIndex] then
+								alreadyCountered[i][mechanicIndex] = true
+	      				countered = countered + 1
+	      			end
+	      		end
+		      end
+		    end
+		  end
+		end
+	end
+	return countered
+end
+
 function RE:GetMissonSlowdown(missionID)
   local enemies = select(8, GetMissionInfo(missionID))
   local slowicons = " "
@@ -186,63 +233,30 @@ function RE:GetMissonSlowdown(missionID)
   end
 end
 
-function RE:GetTeamChances()
+function RE:GetMissionChance()
 	local followers = GetFollowers(RE.F.followerTypeID)
 	local missionID = RE.MissionPage.missionInfo.missionID
-	local baseChance = GetMissionSuccessChance(missionID)
+
+	if RE:CheckIfMissionIsFull(RE.MissionPage) then
+		RE.FollowersChanceCache = {}
+		return
+	end
 
 	for i=1, #followers do
 		local follower = followers[i]
 		if follower.isCollected and not follower.status then
-		  AddFollowerToMission(missionID, followers[i].followerID)
-		  local chance = select(4, GetPartyMissionInfo(missionID))
-		  RE.FollowersChanceCache[follower.followerID] = chance - baseChance
-		  RemoveFollowerFromMission(missionID, followers[i].followerID)
+			local _, totalTimeSecondsOld, _, successChanceOld = GetPartyMissionInfo(missionID)
+			local mechanicCounteredOld = RE:GetMissionCounteredThreats(RE.MissionPage.Followers, RE.MissionPage.Enemies)
+		  AddFollowerToMission(missionID, follower.followerID)
+		  local _, totalTimeSeconds, _, successChance = GetPartyMissionInfo(missionID)
+			local mechanicCountered = RE:GetMissionCounteredThreats(RE.MissionPage.Followers, RE.MissionPage.Enemies, follower)
+		  RE.FollowersChanceCache[follower.followerID] = {totalTimeSeconds < totalTimeSecondsOld, successChance - successChanceOld, mechanicCountered > mechanicCounteredOld}
+		  RemoveFollowerFromMission(missionID, follower.followerID)
 		end
 	end
 end
 
-function RE:GetRewardCache(mission)
-	if not RE.RewardCache[mission.missionID] then
-		local allRewards = {}
-		if mission.overmaxRewards then
-			for j = 1, #mission.overmaxRewards do
-				allRewards[#allRewards + 1] = mission.overmaxRewards[j]
-			end
-		end
-		if mission.rewards then
-			for j = 1, #mission.rewards do
-				allRewards[#allRewards + 1] = mission.rewards[j]
-			end
-		end
-		RE.RewardCache[mission.missionID] = allRewards
-	end
-	return RE.RewardCache[mission.missionID]
-end
-
-function RE:ShortValue(v)
-	if RE.PlayerZone == "US" then
-		if abs(v) >= 1e9 then
-			return format("%.2fG", v / 1e9)
-		elseif abs(v) >= 1e6 then
-			return format("%.0fM", v / 1e6)
-		elseif abs(v) >= 1e3 then
-			return format("%.0fk", v / 1e3)
-		else
-			return format("%d", v)
-		end
-	else
-		if abs(v) >= 1e9 then
-			return format("%.2fB", v / 1e9)
-		elseif abs(v) >= 1e6 then
-			return format("%.0fM", v / 1e6)
-		elseif abs(v) >= 1e3 then
-			return format("%.0fK", v / 1e3)
-		else
-			return format("%d", v)
-		end
-	end
-end
+-- New mission tracking functions
 
 function RE:CheckNewMissions()
 	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
@@ -283,6 +297,55 @@ function RE:PrintNewMission(mission)
   PlaySound(44294)
   print(ms)
   RE.MissionCurrentCache[RE.MissionCache[mission].missionID] = true
+end
+
+-- Skinning functions
+
+function RE:FollowerUpdate(self)
+	if not RE.FF or not RE.FF:IsShown() then return end
+
+	local followers = self.followers
+	local buttons = self.listScroll.buttons
+	local offset = HybridScrollFrame_GetOffset(self.listScroll)
+
+	for i = 1, #buttons do
+		local button = buttons[i]
+		local index = offset + i
+		if index <= #followers and button.mode == "FOLLOWER" then
+			button = button.Follower
+			if not button.Renovate then
+				button.Renovate = true
+				button.PortraitFrame.Chance = button.PortraitFrame:CreateFontString()
+				button.PortraitFrame.Chance:SetPoint("CENTER")
+				button.PortraitFrame.Chance:SetFontObject(Game13FontShadow)
+				button.PortraitFrame.ChanceBG = button.PortraitFrame:CreateTexture()
+				button.PortraitFrame.ChanceBG:SetPoint("TOPLEFT", button.PortraitFrame.Chance)
+				button.PortraitFrame.ChanceBG:SetPoint("BOTTOMRIGHT", button.PortraitFrame.Chance)
+				button.PortraitFrame.ChanceBG:SetColorTexture(0, 0, 0, 0.75)
+			end
+			if RE.FollowersChanceCache[button.id] and button.info.isCollected and not button.info.status then
+				local status = ""
+				if RE.FollowersChanceCache[button.id][3] then
+					status = "|cFF00FF00"
+				else
+					status = "|cFFFFFFFF"
+				end
+				if RE.FollowersChanceCache[button.id][2] > 0 then
+					status = status.."+"..RE.FollowersChanceCache[button.id][2].."%|r"
+				else
+					status = status..RE.FollowersChanceCache[button.id][2].."%|r"
+				end
+				if RE.FollowersChanceCache[button.id][1] then
+					status = status.."|n-|TInterface\\Garrison\\orderhall-missions-mechanic5:0|t"
+				end
+				button.PortraitFrame.ChanceBG:Show()
+				button.PortraitFrame.Chance:SetText(status)
+			else
+				button.PortraitFrame.ChanceBG:Hide()
+				button.PortraitFrame.Chance:SetText("")
+			end
+		end
+	end
 end
 
 function RE:MissionUpdate(self)
@@ -388,6 +451,8 @@ function RE:MissionUpdate(self)
   end
 end
 
+-- Sorting functions
+
 function RE:MissionSort()
 	if RE.MissionList.showInProgress then return end
 
@@ -430,4 +495,76 @@ function RE:MissionSortInProgress()
 
     return strcmputf8i(mission1.name, mission2.name) < 0
   end)
+end
+
+-- Support functions
+
+function RE:CheckIfMissionIsFull(missionTab)
+	local followersNeeded = missionTab.missionInfo.numFollowers
+	local followersInParty = 0
+
+	for i=1, #missionTab.Followers do
+		if missionTab.Followers[i].info then
+			followersInParty = followersInParty + 1
+		end
+	end
+
+	return followersNeeded == followersInParty
+end
+
+function RE:GetRewardCache(mission)
+	if not RE.RewardCache[mission.missionID] then
+		local allRewards = {}
+		if mission.overmaxRewards then
+			for j = 1, #mission.overmaxRewards do
+				allRewards[#allRewards + 1] = mission.overmaxRewards[j]
+			end
+		end
+		if mission.rewards then
+			for j = 1, #mission.rewards do
+				allRewards[#allRewards + 1] = mission.rewards[j]
+			end
+		end
+		RE.RewardCache[mission.missionID] = allRewards
+	end
+	return RE.RewardCache[mission.missionID]
+end
+
+function RE:ShortValue(v)
+	if RE.PlayerZone == "US" then
+		if abs(v) >= 1e9 then
+			return format("%.2fG", v / 1e9)
+		elseif abs(v) >= 1e6 then
+			return format("%.0fM", v / 1e6)
+		elseif abs(v) >= 1e3 then
+			return format("%.0fk", v / 1e3)
+		else
+			return format("%d", v)
+		end
+	else
+		if abs(v) >= 1e9 then
+			return format("%.2fB", v / 1e9)
+		elseif abs(v) >= 1e6 then
+			return format("%.0fM", v / 1e6)
+		elseif abs(v) >= 1e3 then
+			return format("%.0fK", v / 1e3)
+		else
+			return format("%d", v)
+		end
+	end
+end
+
+function RE:CopyTable(t)
+    if type(t) ~= "table" then return t end
+    local meta = getmetatable(t)
+    local target = {}
+    for k, v in pairs(t) do
+        if type(v) == "table" then
+            target[k] = RE:CopyTable(v)
+        else
+            target[k] = v
+        end
+    end
+    setmetatable(target, meta)
+    return target
 end
