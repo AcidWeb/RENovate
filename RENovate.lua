@@ -25,7 +25,7 @@ local NewTicker = _G.C_Timer.NewTicker
 local PlaySound = _G.PlaySound
 local ElvUI = _G.ElvUI
 
-RE.Version = 120
+RE.Version = 130
 RE.ParsingInProgress = False
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
 RE.RewardCache = {}
@@ -59,6 +59,7 @@ function RE:OnEvent(self, event, name)
 		RE.OriginalUpdateFollowers = RE.FF.UpdateData
     RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
     RE.OriginalSort = _G.Garrison_SortMissions
+		RE.AlertSystem = _G.AlertFrame:AddSimpleAlertFrameSubSystem("GarrisonRandomMissionAlertFrameTemplate", _G.RENovateAlertSystemTemplate)
 
     ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
     ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
@@ -294,8 +295,8 @@ function RE:PrintNewMission(mission)
     end
   end
 
-  PlaySound(44294)
-  print(ms)
+	print(ms)
+	RE.AlertSystem:AddAlert(RE.MissionCache[mission])
   RE.MissionCurrentCache[RE.MissionCache[mission].missionID] = true
 end
 
@@ -567,4 +568,9 @@ function RE:CopyTable(t)
     end
     setmetatable(target, meta)
     return target
+end
+
+function _G.RENovateAlertSystemTemplate(frame, missionInfo)
+	frame.Rare:Hide()
+  PlaySound(44294)
 end
