@@ -26,7 +26,8 @@ local PlaySound = _G.PlaySound
 local ElvUI = _G.ElvUI
 
 RE.Version = 130
-RE.ParsingInProgress = False
+RE.ParsingInProgress = false
+RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
 RE.RewardCache = {}
 RE.MissionCache = {}
@@ -41,6 +42,7 @@ function RE:OnLoad(self)
 	self:RegisterEvent("ADDON_LOADED")
 	self:RegisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
 	self:RegisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
+	self:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 end
 
 function RE:OnEvent(self, event, name)
@@ -136,6 +138,9 @@ function RE:OnEvent(self, event, name)
 		RE:GetMissionChance()
 		collectgarbage()
 		RE.ParsingInProgress = false
+	elseif event == "GET_ITEM_INFO_RECEIVED" and RE.ItemNeeded then
+		RE.ItemNeeded = false
+		RE:CheckNewMissions()
 	end
 end
 
@@ -277,7 +282,10 @@ function RE:PrintNewMission(mission)
     local link = ""
     if reward.itemID and reward.itemID ~= 0 then
       link = select(2, GetItemInfo(reward.itemID))
-      if not link then return end
+      if not link then
+				RE.ItemNeeded = true
+				return
+			end
       ms = ms.."|n"..reward.quantity.."x "..link
 			if LAP:DoesItemGrantArtifactPower(reward.itemID) then
 				ms = ms.." |cFFE5CC7f"..RE:ShortValue(LAP:GetArtifactPowerGrantedByItem(reward.itemID)).." "..ARTIFACT_POWER.."|r"
@@ -285,7 +293,10 @@ function RE:PrintNewMission(mission)
     elseif reward.currencyID then
       if reward.currencyID ~= 0 then
         link = GetCurrencyLink(reward.currencyID)
-        if not link then return end
+				if not link then
+					RE.ItemNeeded = true
+					return
+				end
         ms = ms.."|n"..reward.quantity.."x "..link
       else
         ms = ms.."|n|cFFCC9900"..floor(reward.quantity / 10000).." "..BONUS_ROLL_REWARD_MONEY.."|r"
