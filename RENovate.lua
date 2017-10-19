@@ -15,6 +15,7 @@ local GetMissionLink = _G.C_Garrison.GetMissionLink
 local GetPartyMissionInfo = _G.C_Garrison.GetPartyMissionInfo
 local GetFollowers = _G.C_Garrison.GetFollowers
 local GetFollowerAbilities = _G.C_Garrison.GetFollowerAbilities
+local RequestClassSpecCategoryInfo = _G.C_Garrison.RequestClassSpecCategoryInfo
 local AddFollowerToMission = _G.C_Garrison.AddFollowerToMission
 local RemoveFollowerFromMission = _G.C_Garrison.RemoveFollowerFromMission
 local GetItemInfo = _G.GetItemInfo
@@ -22,6 +23,7 @@ local GetCurrencyLink = _G.GetCurrencyLink
 local CreateFrame = _G.CreateFrame
 local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local NewTicker = _G.C_Timer.NewTicker
+local After = _G.C_Timer.After
 local PlaySound = _G.PlaySound
 local ElvUI = _G.ElvUI
 
@@ -51,8 +53,10 @@ function RE:OnEvent(self, event, name)
 			_G.RENovateSettings = {["IgnoredMissions"] = {}}
 		end
 		RE.Settings = _G.RENovateSettings
+		RE.AlertSystem = _G.AlertFrame:AddSimpleAlertFrameSubSystem("GarrisonRandomMissionAlertFrameTemplate", _G.RENovateAlertSystemTemplate)
+		After(30, function() RequestClassSpecCategoryInfo(LE_FOLLOWER_TYPE_GARRISON_7_0) end)
 		LAD:ForceUpdate()
-
+	elseif event == "ADDON_LOADED" and name == "Blizzard_OrderHallUI" then
 		RE.F = _G.OrderHallMissionFrame
 		RE.FF = _G.OrderHallMissionFrameFollowers
 		RE.MissionList = RE.F.MissionTab.MissionList
@@ -61,7 +65,6 @@ function RE:OnEvent(self, event, name)
 		RE.OriginalUpdateFollowers = RE.FF.UpdateData
 		RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
 		RE.OriginalSort = _G.Garrison_SortMissions
-		RE.AlertSystem = _G.AlertFrame:AddSimpleAlertFrameSubSystem("GarrisonRandomMissionAlertFrameTemplate", _G.RENovateAlertSystemTemplate)
 
 		ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
 		ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
@@ -187,7 +190,7 @@ end
 
 function RE:GetMissionCounteredThreats(followersOrg, enemies, newFollower)
 	local followers = RE:CopyTable(followersOrg)
-	local alreadyCountered = {[1] = {}, [2] = {}, [3] = {}, [4] = {}, [5] = {}}
+	local alreadyCountered = {}
 	local countered = 0
 
 	if newFollower then
@@ -208,6 +211,7 @@ function RE:GetMissionCounteredThreats(followersOrg, enemies, newFollower)
 					for i = 1, #enemies do
 						local enemy = enemies[i]
 						for mechanicIndex = 1, #enemy.Mechanics do
+							if not alreadyCountered[i] then alreadyCountered[i] = {} end
 							if counterID == enemy.Mechanics[mechanicIndex].mechanicID and not alreadyCountered[i][mechanicIndex] then
 								alreadyCountered[i][mechanicIndex] = true
 								countered = countered + 1
@@ -248,11 +252,12 @@ function RE:GetMissionChance()
 		return
 	end
 
+	local _, totalTimeSecondsOld, _, successChanceOld = GetPartyMissionInfo(missionID)
+	local mechanicCounteredOld = RE:GetMissionCounteredThreats(RE.MissionPage.Followers, RE.MissionPage.Enemies)
+
 	for i=1, #followers do
 		local follower = followers[i]
 		if follower.isCollected and not follower.status then
-			local _, totalTimeSecondsOld, _, successChanceOld = GetPartyMissionInfo(missionID)
-			local mechanicCounteredOld = RE:GetMissionCounteredThreats(RE.MissionPage.Followers, RE.MissionPage.Enemies)
 			AddFollowerToMission(missionID, follower.followerID)
 			local _, totalTimeSeconds, _, successChance = GetPartyMissionInfo(missionID)
 			local mechanicCountered = RE:GetMissionCounteredThreats(RE.MissionPage.Followers, RE.MissionPage.Enemies, follower)
@@ -267,7 +272,7 @@ end
 function RE:CheckNewMissions()
 	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
 	for i=1, #RE.MissionCache do
-		if RE.MissionCurrentCache[RE.MissionCache[i].missionID] == nil and not RE.Settings.IgnoredMissions[RE.MissionCache[i].missionID] and not RE.F:IsShown() then
+		if RE.MissionCurrentCache[RE.MissionCache[i].missionID] == nil and not RE.Settings.IgnoredMissions[RE.MissionCache[i].missionID] then
 			RE:PrintNewMission(i)
 		end
 	end
