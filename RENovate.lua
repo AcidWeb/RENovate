@@ -53,7 +53,7 @@ function RE:OnEvent(self, event, name)
 			_G.RENovateSettings = {["IgnoredMissions"] = {}}
 		end
 		RE.Settings = _G.RENovateSettings
-		RE.AlertSystem = _G.AlertFrame:AddSimpleAlertFrameSubSystem("GarrisonRandomMissionAlertFrameTemplate", _G.RENovateAlertSystemTemplate)
+		RE.AlertSystem = _G.AlertFrame:AddQueuedAlertFrameSubSystem("GarrisonRandomMissionAlertFrameTemplate", _G.RENovateAlertSystemTemplate, 1, 0)
 		After(30, function() RequestClassSpecCategoryInfo(LE_FOLLOWER_TYPE_GARRISON_7_0) end)
 		LAD:ForceUpdate()
 	elseif event == "ADDON_LOADED" and name == "Blizzard_OrderHallUI" then
