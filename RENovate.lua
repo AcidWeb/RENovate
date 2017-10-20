@@ -4,10 +4,11 @@ local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
 local LAD = LibStub("LibArtifactData-1.0")
 
---GLOBALS: LE_FOLLOWER_TYPE_GARRISON_7_0, PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font, Game13FontShadow
+--GLOBALS: LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font, Game13FontShadow
 local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
+local GetLandingPageGarrisonType = _G.C_Garrison.GetLandingPageGarrisonType
 local GetMissionInfo = _G.C_Garrison.GetMissionInfo
 local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
 local GetAvailableMissions = _G.C_Garrison.GetAvailableMissions
@@ -42,7 +43,6 @@ RE.PlayerZone = GetCVar("portal")
 
 function RE:OnLoad(self)
 	self:RegisterEvent("ADDON_LOADED")
-	self:RegisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
 	self:RegisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
 	self:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 end
@@ -54,7 +54,7 @@ function RE:OnEvent(self, event, name)
 		end
 		RE.Settings = _G.RENovateSettings
 		RE.AlertSystem = _G.AlertFrame:AddQueuedAlertFrameSubSystem("GarrisonRandomMissionAlertFrameTemplate", _G.RENovateAlertSystemTemplate, 1, 0)
-		After(30, function() RequestClassSpecCategoryInfo(LE_FOLLOWER_TYPE_GARRISON_7_0) end)
+		RE:FillMissionCache()
 		LAD:ForceUpdate()
 	elseif event == "ADDON_LOADED" and name == "Blizzard_OrderHallUI" then
 		RE.F = _G.OrderHallMissionFrame
@@ -127,15 +127,6 @@ function RE:OnEvent(self, event, name)
 		end
 
 		self:UnregisterEvent("ADDON_LOADED")
-	elseif event == "GARRISON_FOLLOWER_CATEGORIES_UPDATED" then
-		GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
-		if #RE.MissionCache == 0 then return end
-		for i=1, #RE.MissionCache do
-			RE.MissionCurrentCache[RE.MissionCache[i].missionID] = true
-		end
-		RE.CheckTimer = NewTicker(60, RE.CheckNewMissions)
-
-		self:UnregisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
 	elseif event == "GARRISON_FOLLOWER_LIST_UPDATE" and RE.MissionPage:IsShown() and not RE.ParsingInProgress then
 		RE.ParsingInProgress = true
 		RE:GetMissionChance()
@@ -527,6 +518,16 @@ function RE:CheckIfMissionIsFull(missionTab)
 	end
 
 	return followersNeeded == followersInParty
+end
+
+function RE:FillMissionCache()
+	if not GetLandingPageGarrisonType() == LE_GARRISON_TYPE_7_0 then return end
+	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
+	if #RE.MissionCache == 0 then After(30, RE.FillMissionCache) end
+	for i=1, #RE.MissionCache do
+		RE.MissionCurrentCache[RE.MissionCache[i].missionID] = true
+	end
+	NewTicker(60, RE.CheckNewMissions)
 end
 
 function RE:GetRewardCache(mission)
