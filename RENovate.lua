@@ -4,7 +4,7 @@ local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
 local LAD = LibStub("LibArtifactData-1.0")
 
---GLOBALS: LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font, Game13FontShadow
+--GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font, Game13FontShadow
 local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
@@ -26,9 +26,10 @@ local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local NewTicker = _G.C_Timer.NewTicker
 local After = _G.C_Timer.After
 local PlaySound = _G.PlaySound
+local ReloadUI = _G.ReloadUI
 local ElvUI = _G.ElvUI
 
-RE.Version = 131
+RE.Version = 132
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -38,23 +39,25 @@ RE.MissionCurrentCache = {}
 RE.FollowersChanceCache = {}
 RE.UpdateTimer = -1
 RE.PlayerZone = GetCVar("portal")
+SLASH_RENOVATE1 = "/renovate"
 
 -- Event functions
 
 function RE:OnLoad(self)
 	self:RegisterEvent("ADDON_LOADED")
-	self:RegisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
-	self:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 end
 
 function RE:OnEvent(self, event, name)
 	if event == "ADDON_LOADED" and name == "RENovate" then
-		if not _G.RENovateSettings then
-			_G.RENovateSettings = {["IgnoredMissions"] = {}}
+		RE:ParseSettings()
+		if RE.Settings.NewMissionNotification then
+			self:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+			RE.AlertSystem = _G.AlertFrame:AddQueuedAlertFrameSubSystem("GarrisonRandomMissionAlertFrameTemplate", _G.RENovateAlertSystemTemplate, 1, 0)
+			RE:FillMissionCache()
 		end
-		RE.Settings = _G.RENovateSettings
-		RE.AlertSystem = _G.AlertFrame:AddQueuedAlertFrameSubSystem("GarrisonRandomMissionAlertFrameTemplate", _G.RENovateAlertSystemTemplate, 1, 0)
-		RE:FillMissionCache()
+		if RE.Settings.ImprovedFollowerPanel then
+			self:RegisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
+		end
 		LAD:ForceUpdate()
 	elseif event == "ADDON_LOADED" and name == "Blizzard_OrderHallUI" then
 		RE.F = _G.OrderHallMissionFrame
@@ -70,7 +73,9 @@ function RE:OnEvent(self, event, name)
 		ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
 
 		-- Refresh team data when mission is opened
-		hooksecurefunc("GarrisonMissionButton_OnClick", function() RE:OnEvent(nil, 'GARRISON_FOLLOWER_LIST_UPDATE') end)
+		if RE.Settings.ImprovedFollowerPanel then
+			hooksecurefunc("GarrisonMissionButton_OnClick", function() RE:OnEvent(nil, "GARRISON_FOLLOWER_LIST_UPDATE") end)
+		end
 
 		-- Force refresh of "In Progress" tab when needed
 		hooksecurefunc("GarrisonMissionListTab_SetTab", function() RE.UpdateTimer = -1 end)
@@ -105,9 +110,11 @@ function RE:OnEvent(self, event, name)
 			RE.OriginalUpdate(self)
 			RE:MissionUpdate(self)
 		end
-		function RE.FF:UpdateData()
-			RE.OriginalUpdateFollowers(self)
-			RE:FollowerUpdate(self)
+		if RE.Settings.ImprovedFollowerPanel then
+			function RE.FF:UpdateData()
+				RE.OriginalUpdateFollowers(self)
+				RE:FollowerUpdate(self)
+			end
 		end
 
 		-- Pre-hook to disable tooltips in Order Hall mission table
@@ -376,7 +383,7 @@ function RE:MissionUpdate(self)
 				button:SetScript("OnEnter", nil)
 				button:SetScript("OnLeave", nil)
 				if ElvUI then
-					ElvUI[1]:GetModule('Skins'):HandleButton(button)
+					ElvUI[1]:GetModule("Skins"):HandleButton(button)
 				else
 					button.Title:SetFontObject(Fancy18Font)
 					button.Summary:SetFontObject(Game13Font)
@@ -575,6 +582,25 @@ function RE:ShortValue(v)
 	end
 end
 
+function RE:ParseSettings()
+	local defaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true}
+	if not _G.RENovateSettings then _G.RENovateSettings = defaultSettings end
+	RE.Settings = _G.RENovateSettings
+	for key, value in pairs(defaultSettings) do
+		if RE.Settings[key] == nil then
+			RE.Settings[key] = value
+		end
+	end
+end
+
+function RE.PrintSettings(option)
+	if RE.Settings[option] then
+		return "|cFF008000ON|r"
+	else
+		return "|cFFFF0000OFF|r"
+	end
+end
+
 function RE:CopyTable(t)
 	if type(t) ~= "table" then return t end
 	local meta = getmetatable(t)
@@ -588,6 +614,22 @@ function RE:CopyTable(t)
 	end
 	setmetatable(target, meta)
 	return target
+end
+
+function SlashCmdList.RENOVATE(msg)
+	if msg == "" then
+		print("|cFF74D06C[RENovate]|r /renovate <OptionName> to toggle.")
+		for key, value in pairs(RE.Settings) do
+			if type(value) == "boolean" then
+				print(string.format("%s - %s", key, RE.PrintSettings(key)))
+			end
+		end
+	else
+		if RE.Settings[msg] ~= nil and type(RE.Settings[msg]) == "boolean" then
+			RE.Settings[msg] = not RE.Settings[msg]
+			ReloadUI()
+		end
+	end
 end
 
 function _G.RENovateAlertSystemTemplate(frame, missionInfo)
