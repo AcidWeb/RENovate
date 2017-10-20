@@ -28,7 +28,7 @@ local After = _G.C_Timer.After
 local PlaySound = _G.PlaySound
 local ElvUI = _G.ElvUI
 
-RE.Version = 130
+RE.Version = 131
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -523,7 +523,10 @@ end
 function RE:FillMissionCache()
 	if not GetLandingPageGarrisonType() == LE_GARRISON_TYPE_7_0 then return end
 	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
-	if #RE.MissionCache == 0 then After(30, RE.FillMissionCache) end
+	if #RE.MissionCache == 0 then
+		After(30, RE.FillMissionCache)
+		return
+	end
 	for i=1, #RE.MissionCache do
 		RE.MissionCurrentCache[RE.MissionCache[i].missionID] = true
 	end
