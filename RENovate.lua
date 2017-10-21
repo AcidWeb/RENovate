@@ -8,29 +8,28 @@ local LAD = LibStub("LibArtifactData-1.0")
 local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
+local GetItemInfo = _G.GetItemInfo
+local GetCurrencyLink = _G.GetCurrencyLink
 local GetLandingPageGarrisonType = _G.C_Garrison.GetLandingPageGarrisonType
-local GetMissionInfo = _G.C_Garrison.GetMissionInfo
-local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
 local GetAvailableMissions = _G.C_Garrison.GetAvailableMissions
+local GetMissionInfo = _G.C_Garrison.GetMissionInfo
 local GetMissionLink = _G.C_Garrison.GetMissionLink
 local GetMissionCost = _G.C_Garrison.GetMissionCost
 local GetPartyMissionInfo = _G.C_Garrison.GetPartyMissionInfo
 local GetFollowers = _G.C_Garrison.GetFollowers
 local GetFollowerAbilities = _G.C_Garrison.GetFollowerAbilities
-local RequestClassSpecCategoryInfo = _G.C_Garrison.RequestClassSpecCategoryInfo
+local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
 local AddFollowerToMission = _G.C_Garrison.AddFollowerToMission
 local RemoveFollowerFromMission = _G.C_Garrison.RemoveFollowerFromMission
-local GetItemInfo = _G.GetItemInfo
-local GetCurrencyLink = _G.GetCurrencyLink
 local CreateFrame = _G.CreateFrame
-local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
-local NewTicker = _G.C_Timer.NewTicker
-local After = _G.C_Timer.After
 local PlaySound = _G.PlaySound
 local ReloadUI = _G.ReloadUI
+local InterfaceOptionsFrame_OpenToCategory = _G.InterfaceOptionsFrame_OpenToCategory
+local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
+local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 132
+RE.Version = 140
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -42,6 +41,39 @@ RE.UpdateTimer = -1
 RE.PlayerZone = GetCVar("portal")
 SLASH_RENOVATE1 = "/renovate"
 
+RE.DefaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true, ["DisplayMissionCost"] = false}
+RE.AceConfig = {
+	type = "group",
+	args = {
+		ImprovedFollowerPanel = {
+			name = "Use improved follower panel",
+			desc = "Display impact that follower have on mission chance and some other additional information.",
+			descStyle = "inline",
+			type = "toggle",
+			width = "full",
+			order = 1,
+			set = function(_, val) RE.Settings.ImprovedFollowerPanel = val; ReloadUI() end,
+			get = function(_) return RE.Settings.ImprovedFollowerPanel end
+		},
+		NewMissionNotification = {
+			name = "Display notifications about new missions",
+			type = "toggle",
+			width = "full",
+			order = 2,
+			set = function(_, val) RE.Settings.NewMissionNotification = val; ReloadUI() end,
+			get = function(_) return RE.Settings.NewMissionNotification end
+		},
+		DisplayMissionCost = {
+			name = "Display Order Resource cost on mission list",
+			type = "toggle",
+			width = "full",
+			order = 3,
+			set = function(_, val) RE.Settings.DisplayMissionCost = val end,
+			get = function(_) return RE.Settings.DisplayMissionCost end
+		},
+	}
+}
+
 -- Event functions
 
 function RE:OnLoad(self)
@@ -50,7 +82,16 @@ end
 
 function RE:OnEvent(self, event, name)
 	if event == "ADDON_LOADED" and name == "RENovate" then
-		RE:ParseSettings()
+		if not _G.RENovateSettings then _G.RENovateSettings = RE.DefaultSettings end
+		RE.Settings = _G.RENovateSettings
+		for key, value in pairs(RE.DefaultSettings) do
+			if RE.Settings[key] == nil then
+				RE.Settings[key] = value
+			end
+		end
+		_G.SlashCmdList["RENOVATE"] = function() _G.InterfaceOptionsFrame:Show(); InterfaceOptionsFrame_OpenToCategory(RE.OptionsMenu) end
+		_G.LibStub("AceConfigRegistry-3.0"):RegisterOptionsTable("RENovate", RE.AceConfig)
+		RE.OptionsMenu = _G.LibStub("AceConfigDialog-3.0"):AddToBlizOptions("RENovate", "RENovate")
 		if RE.Settings.NewMissionNotification then
 			self:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 			RE.AlertSystem = _G.AlertFrame:AddQueuedAlertFrameSubSystem("GarrisonRandomMissionAlertFrameTemplate", _G.RENovateAlertSystemTemplate, 1, 0)
@@ -543,13 +584,13 @@ function RE:FillMissionCache()
 	if not GetLandingPageGarrisonType() == LE_GARRISON_TYPE_7_0 then return end
 	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
 	if #RE.MissionCache == 0 then
-		After(30, RE.FillMissionCache)
+		Timer.After(30, RE.FillMissionCache)
 		return
 	end
 	for i=1, #RE.MissionCache do
 		RE.MissionCurrentCache[RE.MissionCache[i].missionID] = true
 	end
-	NewTicker(60, RE.CheckNewMissions)
+	Timer.NewTicker(60, RE.CheckNewMissions)
 end
 
 function RE:GetRewardCache(mission)
@@ -594,25 +635,6 @@ function RE:ShortValue(v)
 	end
 end
 
-function RE:ParseSettings()
-	local defaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true, ["DisplayMissionCost"] = false}
-	if not _G.RENovateSettings then _G.RENovateSettings = defaultSettings end
-	RE.Settings = _G.RENovateSettings
-	for key, value in pairs(defaultSettings) do
-		if RE.Settings[key] == nil then
-			RE.Settings[key] = value
-		end
-	end
-end
-
-function RE.PrintSettings(option)
-	if RE.Settings[option] then
-		return "|cFF008000ON|r"
-	else
-		return "|cFFFF0000OFF|r"
-	end
-end
-
 function RE:CopyTable(t)
 	if type(t) ~= "table" then return t end
 	local meta = getmetatable(t)
@@ -626,22 +648,6 @@ function RE:CopyTable(t)
 	end
 	setmetatable(target, meta)
 	return target
-end
-
-function SlashCmdList.RENOVATE(msg)
-	if msg == "" then
-		print("|cFF74D06C[RENovate]|r /renovate <OptionName> to toggle.")
-		for key, value in pairs(RE.Settings) do
-			if type(value) == "boolean" then
-				print(string.format("%s - %s", key, RE.PrintSettings(key)))
-			end
-		end
-	else
-		if RE.Settings[msg] ~= nil and type(RE.Settings[msg]) == "boolean" then
-			RE.Settings[msg] = not RE.Settings[msg]
-			ReloadUI()
-		end
-	end
 end
 
 function _G.RENovateAlertSystemTemplate(frame, missionInfo)
