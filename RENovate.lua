@@ -4,7 +4,7 @@ local RE = RENovateNamespace
 local LAP = LibStub("LibArtifactPower-1.0")
 local LAD = LibStub("LibArtifactData-1.0")
 
---GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, PARENS_TEMPLATE, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, RED_FONT_COLOR_CODE, YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font, Game13FontShadow
+--GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font, Game13FontShadow
 local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
@@ -294,7 +294,7 @@ function RE:PrintNewMission(mission)
 			end
 			ms = ms.."|n"..reward.quantity.."x "..link
 			if LAP:DoesItemGrantArtifactPower(reward.itemID) then
-				ms = ms.." |cFFE5CC7f"..RE:ShortValue(LAP:GetArtifactPowerGrantedByItem(reward.itemID)).." "..ARTIFACT_POWER.."|r"
+				ms = ms.." |cFFE5CC7F"..RE:ShortValue(LAP:GetArtifactPowerGrantedByItem(reward.itemID)).." "..ARTIFACT_POWER.."|r"
 			end
 		elseif reward.currencyID then
 			if reward.currencyID ~= 0 then
@@ -421,17 +421,21 @@ function RE:MissionUpdate(self)
 				end
 
 				local originalText = (mission.durationSeconds < GARRISON_LONG_MISSION_TIME) and mission.duration or string.format(GARRISON_LONG_MISSION_TIME_FORMAT, mission.duration)
+				local additionalText = ""
+				if RE.Settings.DisplayMissionCost then
+					additionalText = " / |cFFFFFFFF"..mission.cost.."|r |TInterface\\Icons\\INV_OrderHall_OrderResources:0|t"
+				end
 				if mission.offerEndTime then
 					local timeRemaining = mission.offerEndTime - GetTime()
 					local colorCode, colorCodeEnd = "", ""
 					if timeRemaining < 8 * 3600 then
-						colorCode, colorCodeEnd = RED_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE
+						colorCode, colorCodeEnd = "|cFFFF2020", "|r"
 					elseif timeRemaining < 24 * 3600 then
-						colorCode, colorCodeEnd = YELLOW_FONT_COLOR_CODE, FONT_COLOR_CODE_CLOSE
+						colorCode, colorCodeEnd = "|cFFFFFF00", "|r"
 					end
-					button.Summary:SetText(originalText..RE:GetMissonSlowdown(mission.missionID).." / "..colorCode..mission.offerTimeRemaining..colorCodeEnd)
+					button.Summary:SetText(originalText..RE:GetMissonSlowdown(mission.missionID).." / "..colorCode..mission.offerTimeRemaining..colorCodeEnd..additionalText)
 				else
-					button.Summary:SetText(originalText..RE:GetMissonSlowdown(mission.missionID))
+					button.Summary:SetText(originalText..RE:GetMissonSlowdown(mission.missionID)..additionalText)
 				end
 			else
 				button.Overlay.Overlay:SetColorTexture(0, 0, 0, 0.4)
@@ -466,7 +470,7 @@ function RE:MissionUpdate(self)
 			for j = 1, #button.Rewards do
 				local itemID = button.Rewards[j].itemID
 				if itemID and LAP:DoesItemGrantArtifactPower(itemID) then
-					button.Rewards[j].Quantity:SetFormattedText("|cffe5cc7f%s|r", RE:ShortValue(LAP:GetArtifactPowerGrantedByItem(itemID)))
+					button.Rewards[j].Quantity:SetFormattedText("|cFFE5CC7F%s|r", RE:ShortValue(LAP:GetArtifactPowerGrantedByItem(itemID)))
 					button.Rewards[j].Quantity:Show()
 				end
 			end
@@ -591,7 +595,7 @@ function RE:ShortValue(v)
 end
 
 function RE:ParseSettings()
-	local defaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true}
+	local defaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true, ["DisplayMissionCost"] = false}
 	if not _G.RENovateSettings then _G.RENovateSettings = defaultSettings end
 	RE.Settings = _G.RENovateSettings
 	for key, value in pairs(defaultSettings) do
