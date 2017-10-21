@@ -134,7 +134,7 @@ function RE:OnEvent(self, event, name)
 		end
 
 		self:UnregisterEvent("ADDON_LOADED")
-	elseif event == "GARRISON_FOLLOWER_LIST_UPDATE" and RE.MissionPage:IsShown() and not RE.ParsingInProgress then
+	elseif event == "GARRISON_FOLLOWER_LIST_UPDATE" and RE.MissionPage and RE.MissionPage:IsShown() and not RE.ParsingInProgress then
 		RE.ParsingInProgress = true
 		RE:GetMissionChance()
 		collectgarbage()
