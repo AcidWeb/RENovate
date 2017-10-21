@@ -13,6 +13,7 @@ local GetMissionInfo = _G.C_Garrison.GetMissionInfo
 local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
 local GetAvailableMissions = _G.C_Garrison.GetAvailableMissions
 local GetMissionLink = _G.C_Garrison.GetMissionLink
+local GetMissionCost = _G.C_Garrison.GetMissionCost
 local GetPartyMissionInfo = _G.C_Garrison.GetPartyMissionInfo
 local GetFollowers = _G.C_Garrison.GetFollowers
 local GetFollowerAbilities = _G.C_Garrison.GetFollowerAbilities
@@ -252,6 +253,7 @@ function RE:GetMissionChance()
 
 	local _, totalTimeSecondsOld, _, successChanceOld = GetPartyMissionInfo(missionID)
 	local mechanicCounteredOld = RE:GetMissionCounteredThreats(RE.MissionPage.Followers, RE.MissionPage.Enemies)
+	local _, costOld = GetMissionCost(missionID)
 
 	for i=1, #followers do
 		local follower = followers[i]
@@ -259,7 +261,8 @@ function RE:GetMissionChance()
 			AddFollowerToMission(missionID, follower.followerID)
 			local _, totalTimeSeconds, _, successChance = GetPartyMissionInfo(missionID)
 			local mechanicCountered = RE:GetMissionCounteredThreats(RE.MissionPage.Followers, RE.MissionPage.Enemies, follower)
-			RE.FollowersChanceCache[follower.followerID] = {totalTimeSeconds < totalTimeSecondsOld, successChance - successChanceOld, mechanicCountered > mechanicCounteredOld}
+			local _, cost = GetMissionCost(missionID)
+			RE.FollowersChanceCache[follower.followerID] = {totalTimeSeconds < totalTimeSecondsOld, successChance - successChanceOld, mechanicCountered > mechanicCounteredOld, cost < costOld}
 			RemoveFollowerFromMission(missionID, follower.followerID)
 		end
 	end
@@ -350,8 +353,13 @@ function RE:FollowerUpdate(self)
 				else
 					status = status..RE.FollowersChanceCache[button.id][2].."%|r"
 				end
+				local prefix = "|n"
 				if RE.FollowersChanceCache[button.id][1] then
-					status = status.."|n-|TInterface\\Garrison\\orderhall-missions-mechanic5:0|t"
+					status = status..prefix.."-|TInterface\\Garrison\\orderhall-missions-mechanic5:0|t"
+					prefix = " "
+				end
+				if RE.FollowersChanceCache[button.id][4] then
+					status = status..prefix.."- |TInterface\\Icons\\INV_OrderHall_OrderResources:0|t"
 				end
 				button.PortraitFrame.ChanceBG:Show()
 				button.PortraitFrame.Chance:SetText(status)
