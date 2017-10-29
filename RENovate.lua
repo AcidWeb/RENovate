@@ -41,35 +41,65 @@ RE.UpdateTimer = -1
 RE.PlayerZone = GetCVar("portal")
 SLASH_RENOVATE1 = "/renovate"
 
-RE.DefaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true, ["DisplayMissionCost"] = false}
+RE.DefaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true, ["DisplayMissionCost"] = false, ["CountUnavailableFollowers"] = false}
 RE.AceConfig = {
 	type = "group",
 	args = {
-		ImprovedFollowerPanel = {
-			name = "Use improved follower panel",
-			desc = "Display impact that follower have on mission chance and some other additional information.",
-			descStyle = "inline",
-			type = "toggle",
-			width = "full",
+		MissionListOptions = {
+			name = "Mission list",
+			type = "group",
 			order = 1,
-			set = function(_, val) RE.Settings.ImprovedFollowerPanel = val; ReloadUI() end,
-			get = function(_) return RE.Settings.ImprovedFollowerPanel end
+			args = {
+				DisplayMissionCost = {
+					name = "Display mission cost",
+					type = "toggle",
+					width = "full",
+					order = 1,
+					set = function(_, val) RE.Settings.DisplayMissionCost = val end,
+					get = function(_) return RE.Settings.DisplayMissionCost end
+				},
+			},
 		},
-		NewMissionNotification = {
-			name = "Display notifications about new missions",
-			type = "toggle",
-			width = "full",
+		MissionDispatchOptions = {
+			name = "Mission dispatch",
+			type = "group",
 			order = 2,
-			set = function(_, val) RE.Settings.NewMissionNotification = val; ReloadUI() end,
-			get = function(_) return RE.Settings.NewMissionNotification end
+			args = {
+				ImprovedFollowerPanel = {
+					name = "Use improved follower panel",
+					desc = "Display impact that follower have on mission chance and some other additional information.",
+					descStyle = "inline",
+					type = "toggle",
+					width = "full",
+					order = 1,
+					set = function(_, val) RE.Settings.ImprovedFollowerPanel = val; ReloadUI() end,
+					get = function(_) return RE.Settings.ImprovedFollowerPanel end
+				},
+				CountUnavailableFollowers = {
+					name = "Calculate impact for unavailable followers",
+					type = "toggle",
+					width = "full",
+					order = 2,
+					disabled = function(_) return not RE.Settings.ImprovedFollowerPanel end,
+					set = function(_, val) RE.Settings.CountUnavailableFollowers = val end,
+					get = function(_) return RE.Settings.CountUnavailableFollowers end
+				},
+			}
 		},
-		DisplayMissionCost = {
-			name = "Display Order Resource cost on mission list",
-			type = "toggle",
-			width = "full",
+		OtherOptions = {
+			name = "Other",
+			type = "group",
 			order = 3,
-			set = function(_, val) RE.Settings.DisplayMissionCost = val end,
-			get = function(_) return RE.Settings.DisplayMissionCost end
+			args = {
+				NewMissionNotification = {
+					name = "Display notifications about new missions",
+					type = "toggle",
+					width = "full",
+					order = 1,
+					set = function(_, val) RE.Settings.NewMissionNotification = val; ReloadUI() end,
+					get = function(_) return RE.Settings.NewMissionNotification end
+				},
+			},
 		},
 	}
 }
@@ -298,7 +328,7 @@ function RE:GetMissionChance()
 
 	for i=1, #followers do
 		local follower = followers[i]
-		if follower.isCollected and not follower.status then
+		if RE:CheckIfFollowerIsFree(follower) then
 			AddFollowerToMission(missionID, follower.followerID)
 			local _, totalTimeSeconds, _, successChance = GetPartyMissionInfo(missionID)
 			local mechanicCountered = RE:GetMissionCounteredThreats(RE.MissionPage.Followers, RE.MissionPage.Enemies, follower)
@@ -382,7 +412,7 @@ function RE:FollowerUpdate(self)
 				button.PortraitFrame.ChanceBG:SetPoint("BOTTOMRIGHT", button.PortraitFrame.Chance)
 				button.PortraitFrame.ChanceBG:SetColorTexture(0, 0, 0, 0.75)
 			end
-			if RE.FollowersChanceCache[button.id] and button.info.isCollected and not button.info.status then
+			if RE.FollowersChanceCache[button.id] and RE:CheckIfFollowerIsFree(button.info) then
 				local status = ""
 				if RE.FollowersChanceCache[button.id][3] then
 					status = "|cFF00FF00"
@@ -578,6 +608,16 @@ function RE:CheckIfMissionIsFull(missionTab)
 	end
 
 	return followersNeeded == followersInParty
+end
+
+function RE:CheckIfFollowerIsFree(follower)
+	if not follower.isCollected then
+		return false
+	elseif not follower.status or RE.Settings.CountUnavailableFollowers then
+		return true
+	else
+		return false
+	end
 end
 
 function RE:FillMissionCache()
