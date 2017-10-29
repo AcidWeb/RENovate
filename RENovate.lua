@@ -1,10 +1,11 @@
 local _G = _G
 _G.RENovateNamespace = {}
 local RE = RENovateNamespace
+local L = LibStub("AceLocale-3.0"):GetLocale("RENovate")
 local LAP = LibStub("LibArtifactPower-1.0")
 local LAD = LibStub("LibArtifactData-1.0")
 
---GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, Fancy18Font, Game13Font, Game13FontShadow
+--GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, Fancy18Font, Game13Font, Game13FontShadow
 local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
@@ -29,7 +30,7 @@ local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 140
+RE.Version = 141
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -46,12 +47,12 @@ RE.AceConfig = {
 	type = "group",
 	args = {
 		MissionListOptions = {
-			name = "Mission list",
+			name = L["Mission list"],
 			type = "group",
 			order = 1,
 			args = {
 				DisplayMissionCost = {
-					name = "Display mission cost",
+					name = L["Display mission cost"],
 					type = "toggle",
 					width = "full",
 					order = 1,
@@ -61,13 +62,13 @@ RE.AceConfig = {
 			},
 		},
 		MissionDispatchOptions = {
-			name = "Mission dispatch",
+			name = L["Mission dispatch"],
 			type = "group",
 			order = 2,
 			args = {
 				ImprovedFollowerPanel = {
-					name = "Use improved follower panel",
-					desc = "Display impact that follower have on mission chance and some other additional information.",
+					name = L["Use improved follower panel"],
+					desc = L["Display impact that follower have on mission chance and some other additional information."],
 					descStyle = "inline",
 					type = "toggle",
 					width = "full",
@@ -76,7 +77,7 @@ RE.AceConfig = {
 					get = function(_) return RE.Settings.ImprovedFollowerPanel end
 				},
 				CountUnavailableFollowers = {
-					name = "Calculate impact for unavailable followers",
+					name = L["Calculate impact for unavailable followers"],
 					type = "toggle",
 					width = "full",
 					order = 2,
@@ -87,12 +88,12 @@ RE.AceConfig = {
 			}
 		},
 		OtherOptions = {
-			name = "Other",
+			name = OTHER,
 			type = "group",
 			order = 3,
 			args = {
 				NewMissionNotification = {
-					name = "Display notifications about new missions",
+					name = L["Display notifications about new missions"],
 					type = "toggle",
 					width = "full",
 					order = 1,
