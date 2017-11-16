@@ -30,7 +30,7 @@ local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 141
+RE.Version = 142
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -81,7 +81,8 @@ RE.AceConfig = {
 					type = "toggle",
 					width = "full",
 					order = 2,
-					disabled = function(_) return not RE.Settings.ImprovedFollowerPanel end,
+					disabled = true,
+					--disabled = function(_) return not RE.Settings.ImprovedFollowerPanel end,
 					set = function(_, val) RE.Settings.CountUnavailableFollowers = val end,
 					get = function(_) return RE.Settings.CountUnavailableFollowers end
 				},
@@ -120,6 +121,7 @@ function RE:OnEvent(self, event, name)
 				RE.Settings[key] = value
 			end
 		end
+		RE.Settings.CountUnavailableFollowers = false
 		_G.SlashCmdList["RENOVATE"] = function() _G.InterfaceOptionsFrame:Show(); InterfaceOptionsFrame_OpenToCategory(RE.OptionsMenu) end
 		_G.LibStub("AceConfigRegistry-3.0"):RegisterOptionsTable("RENovate", RE.AceConfig)
 		RE.OptionsMenu = _G.LibStub("AceConfigDialog-3.0"):AddToBlizOptions("RENovate", "RENovate")
