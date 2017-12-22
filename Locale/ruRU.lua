@@ -1,4 +1,5 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("RENovate", "ruRU")
+if not L then return end
 
 L["Calculate impact for unavailable followers"] = "Рассчитать шанс для недоступных соратников"
 L["Display impact that follower have on mission chance and some other additional information."] = "Отображение шанса соратника на миссию и другая дополнительная информация."

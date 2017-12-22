@@ -30,7 +30,7 @@ local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 143
+RE.Version = 144
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
