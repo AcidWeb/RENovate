@@ -1,7 +1,7 @@
 ## Interface: 70300
 ## Title: |cFF74D06CRE|rNovate
 ## Notes: Tweak order hall mission table.
-## Version: 1.4.2
+## Version: 1.4.3
 ## Author: AcidWeb
 ## SavedVariablesPerCharacter: RENovateSettings
 
