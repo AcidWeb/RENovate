@@ -1,9 +1,8 @@
 local _G = _G
-_G.RENovateNamespace = {}
-local RE = RENovateNamespace
+local _, RE = ...
 local L = LibStub("AceLocale-3.0"):GetLocale("RENovate")
-local LAP = LibStub("LibArtifactPower-1.0")
 local LAD = LibStub("LibArtifactData-1.0")
+_G.RENovate = RE
 
 --GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, Fancy18Font, Game13Font, Game13FontShadow
 local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
@@ -20,6 +19,7 @@ local GetPartyMissionInfo = _G.C_Garrison.GetPartyMissionInfo
 local GetFollowers = _G.C_Garrison.GetFollowers
 local GetFollowerAbilities = _G.C_Garrison.GetFollowerAbilities
 local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
+local IsArtifactPowerItem = _G.IsArtifactPowerItem
 local AddFollowerToMission = _G.C_Garrison.AddFollowerToMission
 local RemoveFollowerFromMission = _G.C_Garrison.RemoveFollowerFromMission
 local CreateFrame = _G.CreateFrame
@@ -30,7 +30,7 @@ local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 144
+RE.Version = 145
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -143,6 +143,7 @@ function RE:OnEvent(self, event, name)
 		RE.OriginalUpdateFollowers = RE.FF.UpdateData
 		RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
 		RE.OriginalSort = _G.Garrison_SortMissions
+		_, RE.AK = LAD:GetArtifactKnowledge()
 
 		ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
 		ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
@@ -367,8 +368,8 @@ function RE:PrintNewMission(mission)
 				return
 			end
 			ms = ms.."|n"..reward.quantity.."x "..link
-			if LAP:DoesItemGrantArtifactPower(reward.itemID) then
-				ms = ms.." |cFFE5CC7F"..RE:ShortValue(LAP:GetArtifactPowerGrantedByItem(reward.itemID)).." "..ARTIFACT_POWER.."|r"
+			if IsArtifactPowerItem(reward.itemID) then
+				ms = ms.." |cFFE5CC7F"..RE:ShortValue(LAD:GetArtifactPowerFromItem(reward.itemID) * RE.AK).." "..ARTIFACT_POWER.."|r"
 			end
 		elseif reward.currencyID then
 			if reward.currencyID ~= 0 then
@@ -543,8 +544,8 @@ function RE:MissionUpdate(self)
 
 			for j = 1, #button.Rewards do
 				local itemID = button.Rewards[j].itemID
-				if itemID and LAP:DoesItemGrantArtifactPower(itemID) then
-					button.Rewards[j].Quantity:SetFormattedText("|cFFE5CC7F%s|r", RE:ShortValue(LAP:GetArtifactPowerGrantedByItem(itemID)))
+				if itemID and IsArtifactPowerItem(itemID) then
+					button.Rewards[j].Quantity:SetFormattedText("|cFFE5CC7F%s|r", RE:ShortValue(LAD:GetArtifactPowerFromItem(itemID) * RE.AK))
 					button.Rewards[j].Quantity:Show()
 				end
 			end
@@ -693,7 +694,7 @@ function RE:CopyTable(t)
 	return target
 end
 
-function _G.RENovateAlertSystemTemplate(frame, missionInfo)
+function _G.RENovateAlertSystemTemplate(frame, _)
 	frame.Rare:Hide()
 	PlaySound(44294)
 end

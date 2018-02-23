@@ -1,11 +1,11 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/..\FrameXML\UI.xsd">
 
 	<Script file="RENovate.lua"/>
-	
-	<Frame name="RENovate">
+
+	<Frame name="RENovateFrame">
 		<Scripts>
-			<OnLoad>RENovateNamespace:OnLoad(self)</OnLoad>
-			<OnEvent>RENovateNamespace:OnEvent(self, event, ...)</OnEvent>
+			<OnLoad>RENovate:OnLoad(self)</OnLoad>
+			<OnEvent>RENovate:OnEvent(self, event, ...)</OnEvent>
 		</Scripts>
 	</Frame>
 
