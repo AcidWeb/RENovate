@@ -134,6 +134,7 @@ function RE:OnEvent(self, event, name)
 			self:RegisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
 		end
 		LAD:ForceUpdate()
+		_, RE.AK = LAD:GetArtifactKnowledge()
 	elseif event == "ADDON_LOADED" and name == "Blizzard_OrderHallUI" then
 		RE.F = _G.OrderHallMissionFrame
 		RE.FF = _G.OrderHallMissionFrameFollowers
@@ -143,7 +144,6 @@ function RE:OnEvent(self, event, name)
 		RE.OriginalUpdateFollowers = RE.FF.UpdateData
 		RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
 		RE.OriginalSort = _G.Garrison_SortMissions
-		_, RE.AK = LAD:GetArtifactKnowledge()
 
 		ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
 		ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
