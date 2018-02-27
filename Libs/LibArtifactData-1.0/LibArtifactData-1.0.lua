@@ -1,4 +1,4 @@
-local MAJOR, MINOR = "LibArtifactData-1.0-RE", 20
+local MAJOR, MINOR = "LibArtifactData-1.0", 21
 
 assert(_G.LibStub, MAJOR .. " requires LibStub")
 local lib = _G.LibStub:NewLibrary(MAJOR, MINOR)
@@ -11,61 +11,7 @@ if _G.AdiDebug then
 	Debug = _G.AdiDebug:Embed({}, MAJOR)
 end
 
--- local store
-local artifacts = {}
-local equippedID, viewedID, activeID
-artifacts.knowledgeLevel = 0
-artifacts.knowledgeMultiplier = 1
-
--- constants
-local _G                       = _G
-local BACKPACK_CONTAINER       = _G.BACKPACK_CONTAINER
-local BANK_CONTAINER           = _G.BANK_CONTAINER
-local INVSLOT_MAINHAND         = _G.INVSLOT_MAINHAND
-local LE_ITEM_CLASS_ARMOR      = _G.LE_ITEM_CLASS_ARMOR
-local LE_ITEM_CLASS_WEAPON     = _G.LE_ITEM_CLASS_WEAPON
-local LE_ITEM_QUALITY_ARTIFACT = _G.LE_ITEM_QUALITY_ARTIFACT
-local NUM_BAG_SLOTS            = _G.NUM_BAG_SLOTS
-local NUM_BANKBAGSLOTS         = _G.NUM_BANKBAGSLOTS
-
--- blizzard api
-local aUI                              = _G.C_ArtifactUI
-local Clear                            = aUI.Clear
-local GetArtifactInfo                  = aUI.GetArtifactInfo
-local GetArtifactKnowledgeLevel        = aUI.GetArtifactKnowledgeLevel
-local GetArtifactKnowledgeMultiplier   = aUI.GetArtifactKnowledgeMultiplier
-local GetContainerItemInfo             = _G.GetContainerItemInfo
-local GetContainerNumSlots             = _G.GetContainerNumSlots
-local GetCostForPointAtRank            = aUI.GetCostForPointAtRank
-local GetEquippedArtifactInfo          = aUI.GetEquippedArtifactInfo
-local GetInventoryItemEquippedUnusable = _G.GetInventoryItemEquippedUnusable
-local GetItemInfo                      = _G.GetItemInfo
-local GetItemSpell                     = _G.GetItemSpell
-local GetNumObtainedArtifacts          = aUI.GetNumObtainedArtifacts
-local GetNumPurchasableTraits          = _G.MainMenuBar_GetNumArtifactTraitsPurchasableFromXP
-local GetNumRelicSlots                 = aUI.GetNumRelicSlots
-local GetPowerInfo                     = aUI.GetPowerInfo
-local GetPowers                        = aUI.GetPowers
-local GetRelicInfo                     = aUI.GetRelicInfo
-local GetRelicLockedReason             = aUI.GetRelicLockedReason
-local GetRelicSlotRankInfo             = aUI.GetRelicSlotRankInfo
-local GetSpellInfo                     = _G.GetSpellInfo
-local HasArtifactEquipped              = _G.HasArtifactEquipped
-local IsArtifactPowerItem              = _G.IsArtifactPowerItem
-local IsAtForge                        = aUI.IsAtForge
-local IsViewedArtifactEquipped         = aUI.IsViewedArtifactEquipped
-local SocketContainerItem              = _G.SocketContainerItem
-local SocketInventoryItem              = _G.SocketInventoryItem
-
--- lua api
-local select   = _G.select
-local strmatch = _G.string.match
-local tonumber = _G.tonumber
-
-local private = {} -- private space for the event handlers
-
--- item storage
-local data = {
+local artifactPowerData = {
 	multiplier = {
 		[1] = 1,
 		[2] = 1.25,
@@ -480,6 +426,59 @@ local data = {
 		[138726] = 10, -- Shard of Potentiation
 	}
 }
+
+-- local store
+local artifacts = {}
+local equippedID, viewedID, activeID
+artifacts.knowledgeLevel = 0
+artifacts.knowledgeMultiplier = 1
+
+-- constants
+local _G                       = _G
+local BACKPACK_CONTAINER       = _G.BACKPACK_CONTAINER
+local BANK_CONTAINER           = _G.BANK_CONTAINER
+local INVSLOT_MAINHAND         = _G.INVSLOT_MAINHAND
+local LE_ITEM_CLASS_ARMOR      = _G.LE_ITEM_CLASS_ARMOR
+local LE_ITEM_CLASS_WEAPON     = _G.LE_ITEM_CLASS_WEAPON
+local LE_ITEM_QUALITY_ARTIFACT = _G.LE_ITEM_QUALITY_ARTIFACT
+local NUM_BAG_SLOTS            = _G.NUM_BAG_SLOTS
+local NUM_BANKBAGSLOTS         = _G.NUM_BANKBAGSLOTS
+
+-- blizzard api
+local aUI                              = _G.C_ArtifactUI
+local Clear                            = aUI.Clear
+local GetArtifactInfo                  = aUI.GetArtifactInfo
+local GetArtifactKnowledgeLevel        = aUI.GetArtifactKnowledgeLevel
+local GetArtifactKnowledgeMultiplier   = aUI.GetArtifactKnowledgeMultiplier
+local GetContainerItemInfo             = _G.GetContainerItemInfo
+local GetContainerNumSlots             = _G.GetContainerNumSlots
+local GetCostForPointAtRank            = aUI.GetCostForPointAtRank
+local GetEquippedArtifactInfo          = aUI.GetEquippedArtifactInfo
+local GetInventoryItemEquippedUnusable = _G.GetInventoryItemEquippedUnusable
+local GetItemInfo                      = _G.GetItemInfo
+local GetItemSpell                     = _G.GetItemSpell
+local GetNumObtainedArtifacts          = aUI.GetNumObtainedArtifacts
+local GetNumPurchasableTraits          = _G.MainMenuBar_GetNumArtifactTraitsPurchasableFromXP
+local GetNumRelicSlots                 = aUI.GetNumRelicSlots
+local GetPowerInfo                     = aUI.GetPowerInfo
+local GetPowers                        = aUI.GetPowers
+local GetRelicInfo                     = aUI.GetRelicInfo
+local GetRelicLockedReason             = aUI.GetRelicLockedReason
+local GetRelicSlotRankInfo             = aUI.GetRelicSlotRankInfo
+local GetSpellInfo                     = _G.GetSpellInfo
+local HasArtifactEquipped              = _G.HasArtifactEquipped
+local IsArtifactPowerItem              = _G.IsArtifactPowerItem
+local IsAtForge                        = aUI.IsAtForge
+local IsViewedArtifactEquipped         = aUI.IsViewedArtifactEquipped
+local SocketContainerItem              = _G.SocketContainerItem
+local SocketInventoryItem              = _G.SocketInventoryItem
+
+-- lua api
+local select   = _G.select
+local strmatch = _G.string.match
+local tonumber = _G.tonumber
+
+local private = {} -- private space for the event handlers
 
 lib.frame = lib.frame or _G.CreateFrame("Frame")
 local frame = lib.frame
@@ -989,9 +988,9 @@ function lib.GetArtifactPowerFromItem(_, item)
 
 	if IsArtifactPowerItem(itemID) then
 		local _, _, spellID = GetItemSpell(itemID)
-		return data.multiplier[knowledgeLevel] * (data.spells[spellID] or 0)
-	elseif data.items[itemID] then
-		return data.multiplier[knowledgeLevel] * data.items[itemID]
+		return artifactPowerData.multiplier[knowledgeLevel] * (artifactPowerData.spells[spellID] or 0)
+	elseif artifactPowerData.items[itemID] then
+		return artifactPowerData.multiplier[knowledgeLevel] * artifactPowerData.items[itemID]
 	end
 end
 
