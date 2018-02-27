@@ -1,7 +1,7 @@
 local _G = _G
 local _, RE = ...
 local L = LibStub("AceLocale-3.0"):GetLocale("RENovate")
-local LAD = LibStub("LibArtifactData-1.0")
+local LAD = LibStub("LibArtifactData-1.0-RE")
 _G.RENovate = RE
 
 --GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, Fancy18Font, Game13Font, Game13FontShadow
@@ -30,7 +30,7 @@ local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 145
+RE.Version = 147
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -134,7 +134,7 @@ function RE:OnEvent(self, event, name)
 			self:RegisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
 		end
 		LAD:ForceUpdate()
-		_, RE.AK = LAD:GetArtifactKnowledge()
+		Timer.NewTicker(5, function() _, RE.AK = LAD:GetArtifactKnowledge() end)
 	elseif event == "ADDON_LOADED" and name == "Blizzard_OrderHallUI" then
 		RE.F = _G.OrderHallMissionFrame
 		RE.FF = _G.OrderHallMissionFrameFollowers
