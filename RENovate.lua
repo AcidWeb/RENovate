@@ -30,7 +30,7 @@ local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 148
+RE.Version = 149
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -330,6 +330,8 @@ function RE:GetMissionChance()
 	local mechanicCounteredOld = RE:GetMissionCounteredThreats(RE.MissionPage.Followers, RE.MissionPage.Enemies)
 	local _, costOld = GetMissionCost(missionID)
 
+	RE.MissionPage:Hide()
+	RE.FF:Hide()
 	for i=1, #followers do
 		local follower = followers[i]
 		if RE:CheckIfFollowerIsFree(follower) then
@@ -341,6 +343,8 @@ function RE:GetMissionChance()
 			RemoveFollowerFromMission(missionID, follower.followerID)
 		end
 	end
+	RE.MissionPage:Show()
+	RE.FF:Show()
 end
 
 -- New mission tracking functions
