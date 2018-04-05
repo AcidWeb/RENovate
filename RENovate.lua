@@ -2,10 +2,11 @@ local _G = _G
 local _, RE = ...
 local L = LibStub("AceLocale-3.0"):GetLocale("RENovate")
 local LAD = LibStub("LibArtifactData-1.0")
+local TOAST = LibStub("LibToast-1.0")
 _G.RENovate = RE
 
 --GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, Fancy18Font, Game13Font, Game13FontShadow
-local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, print, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.print, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
+local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
 local GetItemInfo = _G.GetItemInfo
@@ -23,14 +24,14 @@ local IsArtifactPowerItem = _G.IsArtifactPowerItem
 local AddFollowerToMission = _G.C_Garrison.AddFollowerToMission
 local RemoveFollowerFromMission = _G.C_Garrison.RemoveFollowerFromMission
 local CreateFrame = _G.CreateFrame
-local PlaySound = _G.PlaySound
+local PlaySoundFile = _G.PlaySoundFile
 local ReloadUI = _G.ReloadUI
 local InterfaceOptionsFrame_OpenToCategory = _G.InterfaceOptionsFrame_OpenToCategory
 local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 149
+RE.Version = 150
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -127,7 +128,6 @@ function RE:OnEvent(self, event, name)
 		RE.OptionsMenu = _G.LibStub("AceConfigDialog-3.0"):AddToBlizOptions("RENovate", "RENovate")
 		if RE.Settings.NewMissionNotification then
 			self:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-			RE.AlertSystem = _G.AlertFrame:AddQueuedAlertFrameSubSystem("GarrisonRandomMissionAlertFrameTemplate", _G.RENovateAlertSystemTemplate, 1, 0)
 			RE:FillMissionCache()
 		end
 		if RE.Settings.ImprovedFollowerPanel then
@@ -208,6 +208,12 @@ function RE:OnEvent(self, event, name)
 				RE.MissionSort()
 			end
 		end
+
+		TOAST:Register("RENovateToast", function(toast, ...)
+			toast:SetFormattedTitle("|cFF74D06CRE|r|cFFFFFFFFNovate|r - "..GARRISON_MISSION_ADDED_TOAST1.."!")
+			toast:SetFormattedText(...)
+			toast:SetIconTexture([[Interface\Challenges\challenges-gold]])
+		end)
 
 		self:UnregisterEvent("ADDON_LOADED")
 	elseif event == "GARRISON_FOLLOWER_LIST_UPDATE" and RE.MissionPage and RE.MissionPage:IsShown() and not RE.ParsingInProgress then
@@ -350,16 +356,21 @@ end
 -- New mission tracking functions
 
 function RE:CheckNewMissions()
+	local new = false
 	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
 	for i=1, #RE.MissionCache do
 		if RE.MissionCurrentCache[RE.MissionCache[i].missionID] == nil and not RE.Settings.IgnoredMissions[RE.MissionCache[i].missionID] then
 			RE:PrintNewMission(i)
+			new = true
 		end
+	end
+	if new then
+		PlaySoundFile([[Sound\Interface\UI_Garrison_Toast_MissionComplete.ogg]])
 	end
 end
 
 function RE:PrintNewMission(mission)
-	local ms = "|cFF74D06C[RENovate]|r |cFFFF0000"..GARRISON_MISSION_ADDED_TOAST1.."!|r - "..GetMissionLink(RE.MissionCache[mission].missionID)
+	local ms = GetMissionLink(RE.MissionCache[mission].missionID)
 
 	local rewards = RE:GetRewardCache(RE.MissionCache[mission])
 	for i=1, #rewards do
@@ -373,7 +384,7 @@ function RE:PrintNewMission(mission)
 			end
 			ms = ms.."|n"..reward.quantity.."x "..link
 			if IsArtifactPowerItem(reward.itemID) then
-				ms = ms.." |cFFE5CC7F"..RE:ShortValue(LAD:GetArtifactPowerFromItem(reward.itemID) * RE.AK).." "..ARTIFACT_POWER.."|r"
+				ms = ms.."|n|cFFE5CC7F"..RE:ShortValue(LAD:GetArtifactPowerFromItem(reward.itemID) * RE.AK).." "..ARTIFACT_POWER.."|r"
 			end
 		elseif reward.currencyID then
 			if reward.currencyID ~= 0 then
@@ -391,8 +402,7 @@ function RE:PrintNewMission(mission)
 		end
 	end
 
-	print(ms)
-	RE.AlertSystem:AddAlert(RE.MissionCache[mission])
+	TOAST:Spawn("RENovateToast", ms)
 	RE.MissionCurrentCache[RE.MissionCache[mission].missionID] = true
 end
 
@@ -696,9 +706,4 @@ function RE:CopyTable(t)
 	end
 	setmetatable(target, meta)
 	return target
-end
-
-function _G.RENovateAlertSystemTemplate(frame, _)
-	frame.Rare:Hide()
-	PlaySound(44294)
 end
