@@ -411,21 +411,17 @@ end
 function RE:FollowerUpdate(self)
 	if not RE.FF or not RE.FF:IsShown() then return end
 
-	local followers = self.followers
 	local buttons = self.listScroll.buttons
-	local offset = HybridScrollFrame_GetOffset(self.listScroll)
-
 	for i = 1, #buttons do
 		local button = buttons[i]
-		local index = offset + i
-		if index <= #followers and button.mode == "FOLLOWER" then
+		if button.mode == "FOLLOWER" then
 			button = button.Follower
 			if not button.Renovate then
 				button.Renovate = true
-				button.PortraitFrame.Chance = button.PortraitFrame:CreateFontString()
+				button.PortraitFrame.Chance = button.PortraitFrame:CreateFontString(nil, "OVERLAY")
 				button.PortraitFrame.Chance:SetPoint("CENTER")
 				button.PortraitFrame.Chance:SetFontObject(Game13FontShadow)
-				button.PortraitFrame.ChanceBG = button.PortraitFrame:CreateTexture()
+				button.PortraitFrame.ChanceBG = button.PortraitFrame:CreateTexture(nil, "OVERLAY")
 				button.PortraitFrame.ChanceBG:SetPoint("TOPLEFT", button.PortraitFrame.Chance)
 				button.PortraitFrame.ChanceBG:SetPoint("BOTTOMRIGHT", button.PortraitFrame.Chance)
 				button.PortraitFrame.ChanceBG:SetColorTexture(0, 0, 0, 0.75)
@@ -455,6 +451,9 @@ function RE:FollowerUpdate(self)
 			else
 				button.PortraitFrame.ChanceBG:Hide()
 				button.PortraitFrame.Chance:SetText("")
+			end
+			if ElvUI and button.info.isMaxLevel then
+				button.PortraitFrame.Level:Hide()
 			end
 		end
 	end
