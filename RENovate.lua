@@ -126,6 +126,7 @@ function RE:OnEvent(self, event, name)
 		_G.SlashCmdList["RENOVATE"] = function() _G.InterfaceOptionsFrame:Show(); InterfaceOptionsFrame_OpenToCategory(RE.OptionsMenu) end
 		_G.LibStub("AceConfigRegistry-3.0"):RegisterOptionsTable("RENovate", RE.AceConfig)
 		RE.OptionsMenu = _G.LibStub("AceConfigDialog-3.0"):AddToBlizOptions("RENovate", "RENovate")
+
 		if RE.Settings.NewMissionNotification then
 			self:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 			RE:FillMissionCache()
@@ -133,6 +134,14 @@ function RE:OnEvent(self, event, name)
 		if RE.Settings.ImprovedFollowerPanel then
 			self:RegisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
 		end
+
+		TOAST:Register("RENovateToast", function(toast, ...)
+			toast:SetFormattedTitle("|cFF74D06CRE|r|cFFFFFFFFNovate|r - "..GARRISON_MISSION_ADDED_TOAST1.."!")
+			toast:SetFormattedText(...)
+			toast:SetIconTexture([[Interface\Challenges\challenges-gold]])
+			toast:SetSoundFile([[Interface\AddOns\RENovate\Media\Ping.ogg]])
+		end)
+
 		LAD:ForceUpdate()
 		Timer.NewTicker(5, function() _, RE.AK = LAD:GetArtifactKnowledge() end)
 	elseif event == "ADDON_LOADED" and name == "Blizzard_OrderHallUI" then
@@ -208,12 +217,6 @@ function RE:OnEvent(self, event, name)
 				RE.MissionSort()
 			end
 		end
-
-		TOAST:Register("RENovateToast", function(toast, ...)
-			toast:SetFormattedTitle("|cFF74D06CRE|r|cFFFFFFFFNovate|r - "..GARRISON_MISSION_ADDED_TOAST1.."!")
-			toast:SetFormattedText(...)
-			toast:SetIconTexture([[Interface\Challenges\challenges-gold]])
-		end)
 
 		self:UnregisterEvent("ADDON_LOADED")
 	elseif event == "GARRISON_FOLLOWER_LIST_UPDATE" and RE.MissionPage and RE.MissionPage:IsShown() and not RE.ParsingInProgress then
@@ -356,16 +359,11 @@ end
 -- New mission tracking functions
 
 function RE:CheckNewMissions()
-	local new = false
 	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
 	for i=1, #RE.MissionCache do
 		if RE.MissionCurrentCache[RE.MissionCache[i].missionID] == nil and not RE.Settings.IgnoredMissions[RE.MissionCache[i].missionID] then
 			RE:PrintNewMission(i)
-			new = true
 		end
-	end
-	if new then
-		PlaySoundFile([[Sound\Interface\UI_Garrison_Toast_MissionComplete.ogg]])
 	end
 end
 
