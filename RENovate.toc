@@ -1,7 +1,7 @@
 ## Interface: 70300
 ## Title: |cFF74D06CRE|rNovate
-## Notes: Tweak order hall mission table.
-## Version: 1.5.0
+## Notes: Tweak BfA mission table.
+## Version: 2.0.0
 ## Author: AcidWeb
 ## SavedVariablesPerCharacter: RENovateSettings
 ## X-Website: https://www.curseforge.com/wow/addons/renovate-mission-table-extension

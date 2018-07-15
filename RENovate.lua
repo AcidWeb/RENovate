@@ -1,11 +1,10 @@
 local _G = _G
 local _, RE = ...
 local L = LibStub("AceLocale-3.0"):GetLocale("RENovate")
-local LAD = LibStub("LibArtifactData-1.0")
 local TOAST = LibStub("LibToast-1.0")
 _G.RENovate = RE
 
---GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_7_0, LE_FOLLOWER_TYPE_GARRISON_7_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, ORDER_HALL_MISSIONS, ORDER_HALL_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, Fancy18Font, Game13Font, Game13FontShadow
+--GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_8_0, LE_FOLLOWER_TYPE_GARRISON_8_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, WAR_MISSIONS, WAR_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, Fancy18Font, Game13Font, Game13FontShadow
 local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
@@ -20,18 +19,16 @@ local GetPartyMissionInfo = _G.C_Garrison.GetPartyMissionInfo
 local GetFollowers = _G.C_Garrison.GetFollowers
 local GetFollowerAbilities = _G.C_Garrison.GetFollowerAbilities
 local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
-local IsArtifactPowerItem = _G.IsArtifactPowerItem
 local AddFollowerToMission = _G.C_Garrison.AddFollowerToMission
 local RemoveFollowerFromMission = _G.C_Garrison.RemoveFollowerFromMission
 local CreateFrame = _G.CreateFrame
-local PlaySoundFile = _G.PlaySoundFile
 local ReloadUI = _G.ReloadUI
 local InterfaceOptionsFrame_OpenToCategory = _G.InterfaceOptionsFrame_OpenToCategory
 local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 150
+RE.Version = 200
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -43,7 +40,7 @@ RE.UpdateTimer = -1
 RE.PlayerZone = GetCVar("portal")
 SLASH_RENOVATE1 = "/renovate"
 
-RE.DefaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true, ["DisplayMissionCost"] = false, ["CountUnavailableFollowers"] = false}
+RE.DefaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true, ["DisplayMissionCost"] = false, ["CountUnavailableFollowers"] = false, ["BfAWipe"] = false}
 RE.AceConfig = {
 	type = "group",
 	args = {
@@ -107,6 +104,13 @@ RE.AceConfig = {
 	}
 }
 
+local function ElvUISwag(sender)
+  if sender == "Livarax-BurningLegion" then
+    return [[|TInterface\PvPRankBadges\PvPRank09:0|t ]]
+  end
+  return nil
+end
+
 -- Event functions
 
 function RE:OnLoad(self)
@@ -121,6 +125,10 @@ function RE:OnEvent(self, event, name)
 			if RE.Settings[key] == nil then
 				RE.Settings[key] = value
 			end
+		end
+		if not RE.Settings.BfAWipe then
+			RE.Settings.IgnoredMissions = {}
+			RE.Settings.BfAWipe = true
 		end
 		RE.Settings.CountUnavailableFollowers = false
 		_G.SlashCmdList["RENOVATE"] = function() _G.InterfaceOptionsFrame:Show(); InterfaceOptionsFrame_OpenToCategory(RE.OptionsMenu) end
@@ -141,12 +149,9 @@ function RE:OnEvent(self, event, name)
 			toast:SetIconTexture([[Interface\Challenges\challenges-gold]])
 			toast:SetSoundFile([[Interface\AddOns\RENovate\Media\Ping.ogg]])
 		end)
-
-		LAD:ForceUpdate()
-		Timer.NewTicker(5, function() _, RE.AK = LAD:GetArtifactKnowledge() end)
-	elseif event == "ADDON_LOADED" and name == "Blizzard_OrderHallUI" then
-		RE.F = _G.OrderHallMissionFrame
-		RE.FF = _G.OrderHallMissionFrameFollowers
+	elseif event == "ADDON_LOADED" and name == "Blizzard_GarrisonUI" then
+		RE.F = _G.BFAMissionFrame
+		RE.FF = _G.BFAMissionFrameFollowers
 		RE.MissionList = RE.F.MissionTab.MissionList
 		RE.MissionPage = RE.F.MissionTab.MissionPage
 		RE.OriginalUpdate = RE.MissionList.Update
@@ -154,8 +159,8 @@ function RE:OnEvent(self, event, name)
 		RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
 		RE.OriginalSort = _G.Garrison_SortMissions
 
-		ORDER_HALL_MISSIONS = ORDER_HALL_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
-		ORDER_HALL_FOLLOWERS = ORDER_HALL_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
+		WAR_MISSIONS = WAR_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
+		WAR_FOLLOWERS = WAR_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
 
 		-- Refresh team data when mission is opened
 		if RE.Settings.ImprovedFollowerPanel then
@@ -202,7 +207,7 @@ function RE:OnEvent(self, event, name)
 			end
 		end
 
-		-- Pre-hook to disable tooltips in Order Hall mission table
+		-- Pre-hook to disable tooltips at mission table
 		function _G.GarrisonMissionList_UpdateMouseOverTooltip(self)
 			if not RE.F:IsShown() then
 				RE.OriginalTooltip(self)
@@ -216,6 +221,10 @@ function RE:OnEvent(self, event, name)
 			else
 				RE.MissionSort()
 			end
+		end
+
+		if ElvUI then
+			_G.ElvUI[1]:GetModule("Chat"):AddPluginIcons(ElvUISwag)
 		end
 
 		self:UnregisterEvent("ADDON_LOADED")
@@ -359,7 +368,7 @@ end
 -- New mission tracking functions
 
 function RE:CheckNewMissions()
-	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
+	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_8_0)
 	for i=1, #RE.MissionCache do
 		if RE.MissionCurrentCache[RE.MissionCache[i].missionID] == nil and not RE.Settings.IgnoredMissions[RE.MissionCache[i].missionID] then
 			RE:PrintNewMission(i)
@@ -381,12 +390,11 @@ function RE:PrintNewMission(mission)
 				return
 			end
 			ms = ms.."|n"..reward.quantity.."x "..link
-			if IsArtifactPowerItem(reward.itemID) then
-				ms = ms.."|n|cFFE5CC7F"..RE:ShortValue(LAD:GetArtifactPowerFromItem(reward.itemID) * RE.AK).." "..ARTIFACT_POWER.."|r"
-			end
 		elseif reward.currencyID then
-			if reward.currencyID ~= 0 then
-				link = GetCurrencyLink(reward.currencyID)
+			if reward.currencyID == 1553 then
+				ms = ms.."|n|cFFE5CC7F"..RE:ShortValue(reward.quantity).." "..ARTIFACT_POWER.."|r"
+			elseif reward.currencyID ~= 0 then
+				link = GetCurrencyLink(reward.currencyID, reward.quantity)
 				if not link then
 					RE.ItemNeeded = true
 					return
@@ -421,10 +429,10 @@ function RE:FollowerUpdate(self)
 				button.PortraitFrame.Chance:SetFontObject(Game13FontShadow)
 				button.PortraitFrame.ChanceBG = button.PortraitFrame:CreateTexture(nil, "OVERLAY")
 				button.PortraitFrame.ChanceBG:SetPoint("TOPLEFT", button.PortraitFrame.Chance)
-				button.PortraitFrame.ChanceBG:SetPoint("BOTTOMRIGHT", button.PortraitFrame.Chance)
+				button.PortraitFrame.ChanceBG:SetPoint("BOTTOMRIGHT", button.PortraitFrame.Chance, "BOTTOMRIGHT", 0, -1)
 				button.PortraitFrame.ChanceBG:SetColorTexture(0, 0, 0, 0.75)
 			end
-			if RE.FollowersChanceCache[button.id] and RE:CheckIfFollowerIsFree(button.info) then
+			if RE.FollowersChanceCache[button.id] and RE:CheckIfFollowerIsFree(button.info) and RE.MissionPage:IsShown() then
 				local status = ""
 				if RE.FollowersChanceCache[button.id][3] then
 					status = "|cFF00FF00"
@@ -442,7 +450,7 @@ function RE:FollowerUpdate(self)
 					prefix = " "
 				end
 				if RE.FollowersChanceCache[button.id][4] then
-					status = status..prefix.."- |TInterface\\Icons\\INV_OrderHall_OrderResources:0|t"
+					status = status..prefix.."- |TInterface\\Icons\\INV_Faction_WarResources_Round:0|t"
 				end
 				button.PortraitFrame.ChanceBG:Show()
 				button.PortraitFrame.Chance:SetText(status)
@@ -509,7 +517,7 @@ function RE:MissionUpdate(self)
 				local originalText = (mission.durationSeconds < GARRISON_LONG_MISSION_TIME) and mission.duration or string.format(GARRISON_LONG_MISSION_TIME_FORMAT, mission.duration)
 				local additionalText = ""
 				if RE.Settings.DisplayMissionCost then
-					additionalText = " / |cFFFFFFFF"..mission.cost.."|r |TInterface\\Icons\\INV_OrderHall_OrderResources:0|t"
+					additionalText = " / |cFFFFFFFF"..mission.cost.."|r |TInterface\\Icons\\INV_Faction_WarResources_Round:0|t"
 				end
 				if mission.offerEndTime then
 					local timeRemaining = mission.offerEndTime - GetTime()
@@ -554,9 +562,13 @@ function RE:MissionUpdate(self)
 			_G.GarrisonMissionButton_SetRewards(button, rewards, #rewards)
 
 			for j = 1, #button.Rewards do
-				local itemID = button.Rewards[j].itemID
-				if itemID and IsArtifactPowerItem(itemID) then
-					button.Rewards[j].Quantity:SetFormattedText("|cFFE5CC7F%s|r", RE:ShortValue(LAD:GetArtifactPowerFromItem(itemID) * RE.AK))
+				local item = button.Rewards[j]
+				if item.currencyID then
+					if item.currencyID == 1553 then
+						button.Rewards[j].Quantity:SetFormattedText("|cFFE5CC7F%s|r", RE:ShortValue(item.currencyQuantity))
+					elseif item.currencyID ~= 0 then
+						button.Rewards[j].Quantity:SetFormattedText("%s", item.currencyQuantity)
+					end
 					button.Rewards[j].Quantity:Show()
 				end
 			end
@@ -636,8 +648,8 @@ function RE:CheckIfFollowerIsFree(follower)
 end
 
 function RE:FillMissionCache()
-	if not GetLandingPageGarrisonType() == LE_GARRISON_TYPE_7_0 then return end
-	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_7_0)
+	if not GetLandingPageGarrisonType() == LE_GARRISON_TYPE_8_0 then return end
+	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_8_0)
 	if #RE.MissionCache == 0 then
 		Timer.After(30, RE.FillMissionCache)
 		return
