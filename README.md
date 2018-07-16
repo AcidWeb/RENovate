@@ -1,8 +1,8 @@
 ﻿# RENovate
 
-[Curse](https://mods.curse.com/addons/wow/279079-renovate-order-hall-extension)
+[Curse](https://www.curseforge.com/wow/addons/renovate-mission-table-extension)
 
-[WoWInterface](http://www.wowinterface.com/downloads/info24477-RENovate-OrderHallExtension.html)
+[WoWInterface](http://www.wowinterface.com/downloads/fileinfo.php?id=24477)
 
 ## COPYRIGHT
 

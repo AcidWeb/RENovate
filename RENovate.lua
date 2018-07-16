@@ -4,7 +4,7 @@ local L = LibStub("AceLocale-3.0"):GetLocale("RENovate")
 local TOAST = LibStub("LibToast-1.0")
 _G.RENovate = RE
 
---GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_8_0, LE_FOLLOWER_TYPE_GARRISON_8_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, WAR_MISSIONS, WAR_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, Fancy18Font, Game13Font, Game13FontShadow
+--GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_8_0, LE_FOLLOWER_TYPE_GARRISON_8_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, WAR_MISSIONS, WAR_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, HIGHLIGHT_FONT_COLOR, COPPER_PER_GOLD, Fancy18Font, Game13Font, Game13FontShadow
 local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
@@ -15,16 +15,22 @@ local GetAvailableMissions = _G.C_Garrison.GetAvailableMissions
 local GetMissionInfo = _G.C_Garrison.GetMissionInfo
 local GetMissionLink = _G.C_Garrison.GetMissionLink
 local GetMissionCost = _G.C_Garrison.GetMissionCost
+local GetInProgressMissions = _G.C_Garrison.GetInProgressMissions
 local GetPartyMissionInfo = _G.C_Garrison.GetPartyMissionInfo
 local GetFollowers = _G.C_Garrison.GetFollowers
 local GetFollowerAbilities = _G.C_Garrison.GetFollowerAbilities
 local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbilityCountersForMechanicTypes
+local GetMoneyString = _G.GetMoneyString
+local GetCurrencyInfo = _G.GetCurrencyInfo
+local GetColorForCurrencyReward = _G.GetColorForCurrencyReward
+local SetItemButtonQuality = _G.SetItemButtonQuality
 local AddFollowerToMission = _G.C_Garrison.AddFollowerToMission
 local RemoveFollowerFromMission = _G.C_Garrison.RemoveFollowerFromMission
-local CreateFrame = _G.CreateFrame
-local ReloadUI = _G.ReloadUI
 local InterfaceOptionsFrame_OpenToCategory = _G.InterfaceOptionsFrame_OpenToCategory
 local HybridScrollFrame_GetOffset = _G.HybridScrollFrame_GetOffset
+local BreakUpLargeNumbers = _G.BreakUpLargeNumbers
+local CreateFrame = _G.CreateFrame
+local ReloadUI = _G.ReloadUI
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
@@ -150,14 +156,17 @@ function RE:OnEvent(self, event, name)
 			toast:SetSoundFile([[Interface\AddOns\RENovate\Media\Ping.ogg]])
 		end)
 	elseif event == "ADDON_LOADED" and name == "Blizzard_GarrisonUI" then
-		RE.F = _G.BFAMissionFrame
-		RE.FF = _G.BFAMissionFrameFollowers
-		RE.MissionList = RE.F.MissionTab.MissionList
-		RE.MissionPage = RE.F.MissionTab.MissionPage
+		RE.MF = _G.BFAMissionFrame
+		RE.MFF = _G.BFAMissionFrameFollowers
+		RE.GLP = _G.GarrisonLandingPage
+		RE.GLPR = _G.GarrisonLandingPageReport
+		RE.MissionList = RE.MF.MissionTab.MissionList
+		RE.MissionPage = RE.MF.MissionTab.MissionPage
 		RE.OriginalUpdate = RE.MissionList.Update
-		RE.OriginalUpdateFollowers = RE.FF.UpdateData
+		RE.OriginalUpdateFollowers = RE.MFF.UpdateData
 		RE.OriginalTooltip = _G.GarrisonMissionList_UpdateMouseOverTooltip
 		RE.OriginalSort = _G.Garrison_SortMissions
+		RE.OriginalLandingPageUpdate = _G.GarrisonLandingPageReportList_UpdateAvailable
 
 		WAR_MISSIONS = WAR_MISSIONS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
 		WAR_FOLLOWERS = WAR_FOLLOWERS.." - RENovate "..tostring(RE.Version):gsub(".", "%1."):sub(1,-2)
@@ -175,7 +184,7 @@ function RE:OnEvent(self, event, name)
 		RE.MissionList:SetScript("OnUpdate", function (self, elapsed)
 			if RE.UpdateTimer < 0 then
 				if self.showInProgress then
-					_G.C_Garrison.GetInProgressMissions(self.inProgressMissions, RE.F.followerTypeID)
+					GetInProgressMissions(self.inProgressMissions, RE.MF.followerTypeID)
 					RE.MissionSortInProgress()
 					self.Tab2:SetText(WINTERGRASP_IN_PROGRESS.." - "..#self.inProgressMissions)
 					self:Update()
@@ -201,25 +210,31 @@ function RE:OnEvent(self, event, name)
 			RE:MissionUpdate(self)
 		end
 		if RE.Settings.ImprovedFollowerPanel then
-			function RE.FF:UpdateData()
+			function RE.MFF:UpdateData()
 				RE.OriginalUpdateFollowers(self)
 				RE:FollowerUpdate(self)
+			end
+		end
+		function _G.GarrisonLandingPageReportList_UpdateAvailable()
+			RE.OriginalLandingPageUpdate()
+			if RE.GLP.garrTypeID == LE_GARRISON_TYPE_8_0 then
+				RE:LandingMissionUpdate()
 			end
 		end
 
 		-- Pre-hook to disable tooltips at mission table
 		function _G.GarrisonMissionList_UpdateMouseOverTooltip(self)
-			if not RE.F:IsShown() then
+			if not RE.MF:IsShown() then
 				RE.OriginalTooltip(self)
 			end
 		end
 
 		-- Pre-hook to inject available missions sorting function
 		function _G.Garrison_SortMissions(missionsList)
-			if not RE.F:IsShown() then
-				RE.OriginalSort(missionsList)
-			else
+			if RE.MF:IsShown() or (RE.GLP:IsShown() and RE.GLP.garrTypeID == LE_GARRISON_TYPE_8_0) then
 				RE.MissionSort()
+			else
+				RE.OriginalSort(missionsList)
 			end
 		end
 
@@ -255,12 +270,12 @@ end
 -- Mission functions
 
 function RE:GetMissionThreats(missionID, parentFrame)
-	if not RE.F.abilityCountersForMechanicTypes then
-		RE.F.abilityCountersForMechanicTypes = GetFollowerAbilityCountersForMechanicTypes(RE.F.followerTypeID)
+	if not RE.MF.abilityCountersForMechanicTypes then
+		RE.MF.abilityCountersForMechanicTypes = GetFollowerAbilityCountersForMechanicTypes(RE.MF.followerTypeID)
 	end
 
 	local enemies = select(8, GetMissionInfo(missionID))
-	local counterableThreats = _G.GarrisonMission_DetermineCounterableThreats(missionID, RE.F.followerTypeID)
+	local counterableThreats = _G.GarrisonMission_DetermineCounterableThreats(missionID, RE.MF.followerTypeID)
 	local numThreats = 0
 
 	for i = 1, 3 do
@@ -271,8 +286,8 @@ function RE:GetMissionThreats(missionID, parentFrame)
 		for mechanicID, _ in pairs(enemy.mechanics) do
 			numThreats = numThreats + 1
 			local threatFrame = parentFrame.Threat[numThreats]
-			local ability = RE.F.abilityCountersForMechanicTypes[mechanicID]
-			threatFrame.Border:SetShown(_G.ShouldShowFollowerAbilityBorder(RE.F.followerTypeID, ability))
+			local ability = RE.MF.abilityCountersForMechanicTypes[mechanicID]
+			threatFrame.Border:SetShown(_G.ShouldShowFollowerAbilityBorder(RE.MF.followerTypeID, ability))
 			threatFrame.Icon:SetTexture(ability.icon)
 			threatFrame:Show()
 			_G.GarrisonMissionButton_CheckTooltipThreat(threatFrame, missionID, mechanicID, counterableThreats)
@@ -323,7 +338,7 @@ function RE:GetMissonSlowdown(missionID)
 	for i = 1, #enemies do
 		local enemy = enemies[i]
 		for _, mechanic in pairs(enemy.mechanics) do
-			if mechanic.ability and mechanic.ability.id == 428 then
+			if mechanic.ability and (mechanic.ability.id == 428 or mechanic.ability.id == 1078) then
 				slowicons = slowicons.."|TInterface\\Garrison\\orderhall-missions-mechanic5:0|t"
 			end
 		end
@@ -336,7 +351,7 @@ function RE:GetMissonSlowdown(missionID)
 end
 
 function RE:GetMissionChance()
-	local followers = GetFollowers(RE.F.followerTypeID)
+	local followers = GetFollowers(RE.MF.followerTypeID)
 	local missionID = RE.MissionPage.missionInfo.missionID
 
 	if RE:CheckIfMissionIsFull(RE.MissionPage) then
@@ -349,7 +364,7 @@ function RE:GetMissionChance()
 	local _, costOld = GetMissionCost(missionID)
 
 	RE.MissionPage:Hide()
-	RE.FF:Hide()
+	RE.MFF:Hide()
 	for i=1, #followers do
 		local follower = followers[i]
 		if RE:CheckIfFollowerIsFree(follower) then
@@ -362,7 +377,7 @@ function RE:GetMissionChance()
 		end
 	end
 	RE.MissionPage:Show()
-	RE.FF:Show()
+	RE.MFF:Show()
 end
 
 -- New mission tracking functions
@@ -415,7 +430,7 @@ end
 -- Skinning functions
 
 function RE:FollowerUpdate(self)
-	if not RE.FF or not RE.FF:IsShown() then return end
+	if not RE.MFF or not RE.MFF:IsShown() then return end
 
 	local buttons = self.listScroll.buttons
 	for i = 1, #buttons do
@@ -466,7 +481,7 @@ function RE:FollowerUpdate(self)
 end
 
 function RE:MissionUpdate(self)
-	if not RE.F or not RE.F:IsShown() then return end
+	if not RE.MF or not RE.MF:IsShown() then return end
 
 	local missions = self.showInProgress and self.inProgressMissions or self.availableMissions
 	local buttons = self.listScroll.buttons
@@ -576,12 +591,112 @@ function RE:MissionUpdate(self)
 	end
 end
 
+function RE:LandingMissionUpdate()
+	if not RE.GLP or not RE.GLP:IsShown() then return end
+
+	local missions = RE.GLPR.List.AvailableItems
+	local buttons = RE.GLPR.List.listScroll.buttons
+	local offset = HybridScrollFrame_GetOffset(RE.GLPR.List.listScroll)
+
+	for i = 1, #buttons do
+		local button = buttons[i]
+		local index = offset + i
+		if index <= #missions then
+			local mission = missions[index]
+
+			local originalText = button.MissionType:GetText()
+			local additionalText = ""
+			if RE.Settings.DisplayMissionCost then
+				additionalText = " / |cFFFFFFFF"..mission.cost.."|r |TInterface\\Icons\\INV_Faction_WarResources_Round:0|t"
+			end
+			if mission.offerEndTime then
+				local timeRemaining = mission.offerEndTime - GetTime()
+				local colorCode, colorCodeEnd = "", ""
+				if timeRemaining < 8 * 3600 then
+					colorCode, colorCodeEnd = "|cFFFF2020", "|r"
+				elseif timeRemaining < 24 * 3600 then
+					colorCode, colorCodeEnd = "|cFFFFFF00", "|r"
+				end
+				button.MissionType:SetText(originalText..RE:GetMissonSlowdown(mission.missionID).." / "..colorCode..mission.offerTimeRemaining..colorCodeEnd..additionalText)
+			else
+				button.MissionType:SetText(originalText..RE:GetMissonSlowdown(mission.missionID)..additionalText)
+			end
+
+			if mission.rewards and not mission.rewards[2] and mission.overmaxRewards and mission.overmaxRewards[1] then
+				local RewardButton = button.Rewards[2]
+				local Reward = mission.overmaxRewards[1]
+				RewardButton.Quantity:Hide()
+				RewardButton.Quantity:SetTextColor(HIGHLIGHT_FONT_COLOR:GetRGB())
+				RewardButton.currencyID = nil
+				RewardButton.currencyQuantity = nil
+				if Reward.itemID then
+					RewardButton.itemID = Reward.itemID
+					local _, _, quality, _, _, _, _, _, _, itemTexture = GetItemInfo(Reward.itemID)
+					RewardButton.Icon:SetTexture(itemTexture)
+					SetItemButtonQuality(RewardButton, quality, Reward.itemID)
+					if Reward.quantity > 1 then
+						RewardButton.Quantity:SetText(Reward.quantity)
+						RewardButton.Quantity:Show()
+					end
+				else
+					RewardButton.itemID = nil
+					RewardButton.Icon:SetTexture(Reward.icon)
+					RewardButton.title = Reward.title
+					if Reward.currencyID and Reward.quantity then
+						if Reward.currencyID == 0 then
+							RewardButton.tooltip = GetMoneyString(Reward.quantity)
+							RewardButton.Quantity:SetText(BreakUpLargeNumbers(floor(Reward.quantity / COPPER_PER_GOLD)))
+							RewardButton.Quantity:Show()
+						else
+							local _, _, currencyTexture = GetCurrencyInfo(Reward.currencyID)
+							local currencyColor = GetColorForCurrencyReward(Reward.currencyID, Reward.quantity)
+							RewardButton.tooltip = BreakUpLargeNumbers(Reward.quantity).." |T"..currencyTexture..":0:0:0:-1|t "
+							RewardButton.currencyID = Reward.currencyID
+							RewardButton.currencyQuantity = Reward.quantity
+							RewardButton.Quantity:SetText(Reward.quantity)
+							RewardButton.Quantity:SetTextColor(currencyColor:GetRGB())
+							RewardButton.Quantity:Show()
+						end
+					else
+						RewardButton.tooltip = Reward.tooltip
+						if Reward.followerXP then
+							RewardButton.Quantity:SetText(_G.GarrisonLandingPageReportList_FormatXPNumbers(Reward.followerXP))
+							RewardButton.Quantity:Show()
+						end
+					end
+				end
+				RewardButton:Show()
+			end
+
+			if RE.Settings.IgnoredMissions[mission.missionID] then
+				button.BG:SetDesaturated(true)
+				button.MissionTypeIcon:SetDesaturated(true)
+				button.Rewards[1].Icon:SetDesaturated(true)
+				button.Rewards[2].Icon:SetDesaturated(true)
+			else
+				button.BG:SetDesaturated(nil)
+				button.MissionTypeIcon:SetDesaturated(nil)
+				button.Rewards[1].Icon:SetDesaturated(nil)
+				button.Rewards[2].Icon:SetDesaturated(nil)
+			end
+		end
+	end
+
+end
+
 -- Sorting functions
 
 function RE:MissionSort()
-	if RE.MissionList.showInProgress then return end
+	local missionToSort
+	if RE.MF:IsShown() then
+		if RE.MissionList.showInProgress then return end
+		missionToSort = RE.MissionList.availableMissions
+	elseif RE.GLP:IsShown() and RE.GLP.garrTypeID == LE_GARRISON_TYPE_8_0 then
+		if RE.GLPR.selectedTab == RE.GLPR.InProgress then return end
+		missionToSort = RE.GLPR.List.AvailableItems
+	end
 
-	tsort(RE.MissionList.availableMissions, function (mission1, mission2)
+	tsort(missionToSort, function (mission1, mission2)
 		if RE.Settings.IgnoredMissions[mission1.missionID] and not RE.Settings.IgnoredMissions[mission2.missionID] then
 			return false
 		elseif RE.Settings.IgnoredMissions[mission2.missionID] and not RE.Settings.IgnoredMissions[mission1.missionID] then

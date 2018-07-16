@@ -1,4 +1,4 @@
-## Interface: 70300
+## Interface: 80000
 ## Title: |cFF74D06CRE|rNovate
 ## Notes: Tweak BfA mission table.
 ## Version: 2.0.0
