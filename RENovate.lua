@@ -23,6 +23,8 @@ local GetFollowerAbilityCountersForMechanicTypes = _G.C_Garrison.GetFollowerAbil
 local GetMoneyString = _G.GetMoneyString
 local GetCurrencyInfo = _G.GetCurrencyInfo
 local GetColorForCurrencyReward = _G.GetColorForCurrencyReward
+local GetCurrencyContainerInfo = _G.CurrencyContainerUtil.GetCurrencyContainerInfo
+local IsCurrencyContainer = _G.C_CurrencyInfo.IsCurrencyContainer
 local SetItemButtonQuality = _G.SetItemButtonQuality
 local AddFollowerToMission = _G.C_Garrison.AddFollowerToMission
 local RemoveFollowerFromMission = _G.C_Garrison.RemoveFollowerFromMission
@@ -34,7 +36,7 @@ local ReloadUI = _G.ReloadUI
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 200
+RE.Version = 201
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -239,7 +241,7 @@ function RE:OnEvent(self, event, name)
 		end
 
 		if ElvUI then
-			_G.ElvUI[1]:GetModule("Chat"):AddPluginIcons(ElvUISwag)
+			ElvUI[1]:GetModule("Chat"):AddPluginIcons(ElvUISwag)
 		end
 
 		self:UnregisterEvent("ADDON_LOADED")
@@ -653,9 +655,18 @@ function RE:LandingMissionUpdate()
 							RewardButton.tooltip = BreakUpLargeNumbers(Reward.quantity).." |T"..currencyTexture..":0:0:0:-1|t "
 							RewardButton.currencyID = Reward.currencyID
 							RewardButton.currencyQuantity = Reward.quantity
-							RewardButton.Quantity:SetText(Reward.quantity)
+							if IsCurrencyContainer(Reward.currencyID, Reward.quantity) then
+								local _, texture, quantity = GetCurrencyContainerInfo(Reward.currencyID, Reward.quantity)
+								RewardButton.Icon:SetTexture(texture)
+								if quantity > 1 then
+									RewardButton.Quantity:SetText(quantity)
+									RewardButton.Quantity:Show()
+								end
+							else
+								RewardButton.Quantity:SetText(Reward.quantity)
+								RewardButton.Quantity:Show()
+							end
 							RewardButton.Quantity:SetTextColor(currencyColor:GetRGB())
-							RewardButton.Quantity:Show()
 						end
 					else
 						RewardButton.tooltip = Reward.tooltip
