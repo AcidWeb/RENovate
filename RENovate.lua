@@ -9,7 +9,6 @@ local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecu
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
 local GetItemInfo = _G.GetItemInfo
-local GetCurrencyLink = _G.GetCurrencyLink
 local GetLandingPageGarrisonType = _G.C_Garrison.GetLandingPageGarrisonType
 local GetAvailableMissions = _G.C_Garrison.GetAvailableMissions
 local GetMissionInfo = _G.C_Garrison.GetMissionInfo
@@ -24,6 +23,8 @@ local GetMoneyString = _G.GetMoneyString
 local GetCurrencyInfo = _G.GetCurrencyInfo
 local GetColorForCurrencyReward = _G.GetColorForCurrencyReward
 local GetCurrencyContainerInfo = _G.CurrencyContainerUtil.GetCurrencyContainerInfo
+local GetBasicCurrencyInfo  = _G.C_CurrencyInfo.GetBasicCurrencyInfo
+local InCombatLockdown = _G.InCombatLockdown
 local IsCurrencyContainer = _G.C_CurrencyInfo.IsCurrencyContainer
 local SetItemButtonQuality = _G.SetItemButtonQuality
 local AddFollowerToMission = _G.C_Garrison.AddFollowerToMission
@@ -36,7 +37,7 @@ local ReloadUI = _G.ReloadUI
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 201
+RE.Version = 202
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -155,7 +156,7 @@ function RE:OnEvent(self, event, name)
 			toast:SetFormattedTitle("|cFF74D06CRE|r|cFFFFFFFFNovate|r - "..GARRISON_MISSION_ADDED_TOAST1.."!")
 			toast:SetFormattedText(...)
 			toast:SetIconTexture([[Interface\Challenges\challenges-gold]])
-			toast:SetSoundFile([[Interface\AddOns\RENovate\Media\Ping.ogg]])
+			toast:SetSoundFile([[Sound\Interface\UI_Garrison_CommandTable_Follower_LevelUp3.ogg]])
 		end)
 	elseif event == "ADDON_LOADED" and name == "Blizzard_GarrisonUI" then
 		RE.MF = _G.BFAMissionFrame
@@ -385,6 +386,7 @@ end
 -- New mission tracking functions
 
 function RE:CheckNewMissions()
+	if InCombatLockdown() then return end
 	GetAvailableMissions(RE.MissionCache, LE_FOLLOWER_TYPE_GARRISON_8_0)
 	for i=1, #RE.MissionCache do
 		if RE.MissionCurrentCache[RE.MissionCache[i].missionID] == nil and not RE.Settings.IgnoredMissions[RE.MissionCache[i].missionID] then
@@ -411,12 +413,8 @@ function RE:PrintNewMission(mission)
 			if reward.currencyID == 1553 then
 				ms = ms.."|n|cFFE5CC7F"..RE:ShortValue(reward.quantity).." "..ARTIFACT_POWER.."|r"
 			elseif reward.currencyID ~= 0 then
-				link = GetCurrencyLink(reward.currencyID, reward.quantity)
-				if not link then
-					RE.ItemNeeded = true
-					return
-				end
-				ms = ms.."|n"..reward.quantity.."x "..link
+				local currency = GetBasicCurrencyInfo(reward.currencyID, reward.quantity)
+				ms = ms.."|n|cFFFFFFFF+"..reward.quantity.." "..currency.name.."|r"
 			else
 				ms = ms.."|n|cFFCC9900"..floor(reward.quantity / 10000).." "..BONUS_ROLL_REWARD_MONEY.."|r"
 			end
@@ -593,6 +591,63 @@ function RE:MissionUpdate(self)
 	end
 end
 
+function RE:LandingMissionRewardParse(rewardButton, reward)
+	rewardButton.Quantity:Hide()
+	rewardButton.Quantity:SetTextColor(HIGHLIGHT_FONT_COLOR:GetRGB())
+	rewardButton.currencyID = nil
+	rewardButton.currencyQuantity = nil
+	if reward.itemID then
+		rewardButton.itemID = reward.itemID
+		local _, _, quality, _, _, _, _, _, _, itemTexture = GetItemInfo(reward.itemID)
+		rewardButton.Icon:SetTexture(itemTexture)
+		SetItemButtonQuality(rewardButton, quality, reward.itemID)
+		if reward.quantity > 1 then
+			rewardButton.Quantity:SetText(reward.quantity)
+			rewardButton.Quantity:Show()
+		end
+	else
+		rewardButton.itemID = nil
+		rewardButton.Icon:SetTexture(reward.icon)
+		rewardButton.title = reward.title
+		if reward.currencyID and reward.quantity then
+			if reward.currencyID == 0 then
+				rewardButton.tooltip = GetMoneyString(reward.quantity)
+				rewardButton.Quantity:SetText(BreakUpLargeNumbers(floor(reward.quantity / COPPER_PER_GOLD)))
+				rewardButton.Quantity:Show()
+			else
+				local _, _, currencyTexture = GetCurrencyInfo(reward.currencyID)
+				local currencyColor = GetColorForCurrencyReward(reward.currencyID, reward.quantity)
+				rewardButton.tooltip = BreakUpLargeNumbers(reward.quantity).." |T"..currencyTexture..":0:0:0:-1|t "
+				rewardButton.currencyID = reward.currencyID
+				rewardButton.currencyQuantity = reward.quantity
+				if IsCurrencyContainer(reward.currencyID, reward.quantity) then
+					local _, texture, quantity = GetCurrencyContainerInfo(reward.currencyID, reward.quantity)
+					rewardButton.Icon:SetTexture(texture)
+					if rewardButton.currencyID == 1553 then
+						rewardButton.Quantity:SetFormattedText("|cFFE5CC7F%s|r", RE:ShortValue(reward.quantity))
+					elseif quantity > 1 then
+						rewardButton.Quantity:SetText(quantity.."x "..reward.quantity)
+					else
+						rewardButton.Quantity:SetText(reward.quantity)
+					end
+					rewardButton.Quantity:Show()
+				else
+					rewardButton.Quantity:SetText(reward.quantity)
+					rewardButton.Quantity:Show()
+				end
+				rewardButton.Quantity:SetTextColor(currencyColor:GetRGB())
+			end
+		else
+			rewardButton.tooltip = reward.tooltip
+			if reward.followerXP then
+				rewardButton.Quantity:SetText(_G.GarrisonLandingPageReportList_FormatXPNumbers(reward.followerXP))
+				rewardButton.Quantity:Show()
+			end
+		end
+	end
+	rewardButton:Show()
+end
+
 function RE:LandingMissionUpdate()
 	if not RE.GLP or not RE.GLP:IsShown() then return end
 
@@ -624,59 +679,11 @@ function RE:LandingMissionUpdate()
 				button.MissionType:SetText(originalText..RE:GetMissonSlowdown(mission.missionID)..additionalText)
 			end
 
-			if mission.rewards and not mission.rewards[2] and mission.overmaxRewards and mission.overmaxRewards[1] then
-				local RewardButton = button.Rewards[2]
-				local Reward = mission.overmaxRewards[1]
-				RewardButton.Quantity:Hide()
-				RewardButton.Quantity:SetTextColor(HIGHLIGHT_FONT_COLOR:GetRGB())
-				RewardButton.currencyID = nil
-				RewardButton.currencyQuantity = nil
-				if Reward.itemID then
-					RewardButton.itemID = Reward.itemID
-					local _, _, quality, _, _, _, _, _, _, itemTexture = GetItemInfo(Reward.itemID)
-					RewardButton.Icon:SetTexture(itemTexture)
-					SetItemButtonQuality(RewardButton, quality, Reward.itemID)
-					if Reward.quantity > 1 then
-						RewardButton.Quantity:SetText(Reward.quantity)
-						RewardButton.Quantity:Show()
-					end
-				else
-					RewardButton.itemID = nil
-					RewardButton.Icon:SetTexture(Reward.icon)
-					RewardButton.title = Reward.title
-					if Reward.currencyID and Reward.quantity then
-						if Reward.currencyID == 0 then
-							RewardButton.tooltip = GetMoneyString(Reward.quantity)
-							RewardButton.Quantity:SetText(BreakUpLargeNumbers(floor(Reward.quantity / COPPER_PER_GOLD)))
-							RewardButton.Quantity:Show()
-						else
-							local _, _, currencyTexture = GetCurrencyInfo(Reward.currencyID)
-							local currencyColor = GetColorForCurrencyReward(Reward.currencyID, Reward.quantity)
-							RewardButton.tooltip = BreakUpLargeNumbers(Reward.quantity).." |T"..currencyTexture..":0:0:0:-1|t "
-							RewardButton.currencyID = Reward.currencyID
-							RewardButton.currencyQuantity = Reward.quantity
-							if IsCurrencyContainer(Reward.currencyID, Reward.quantity) then
-								local _, texture, quantity = GetCurrencyContainerInfo(Reward.currencyID, Reward.quantity)
-								RewardButton.Icon:SetTexture(texture)
-								if quantity > 1 then
-									RewardButton.Quantity:SetText(quantity)
-									RewardButton.Quantity:Show()
-								end
-							else
-								RewardButton.Quantity:SetText(Reward.quantity)
-								RewardButton.Quantity:Show()
-							end
-							RewardButton.Quantity:SetTextColor(currencyColor:GetRGB())
-						end
-					else
-						RewardButton.tooltip = Reward.tooltip
-						if Reward.followerXP then
-							RewardButton.Quantity:SetText(_G.GarrisonLandingPageReportList_FormatXPNumbers(Reward.followerXP))
-							RewardButton.Quantity:Show()
-						end
-					end
-				end
-				RewardButton:Show()
+			if mission.rewards and mission.rewards[1] then
+				RE:LandingMissionRewardParse(button.Rewards[1], mission.rewards[1])
+			end
+			if mission.overmaxRewards and mission.overmaxRewards[1] then
+				RE:LandingMissionRewardParse(button.Rewards[2], mission.overmaxRewards[1])
 			end
 
 			if RE.Settings.IgnoredMissions[mission.missionID] then
