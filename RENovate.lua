@@ -241,6 +241,20 @@ function RE:OnEvent(self, event, name)
 			end
 		end
 
+		-- Make sure that buttons in "In Progress" tab are not grayed out
+		hooksecurefunc("GarrisonLandingPageReport_SetTab", function()
+			if RE.GLP.garrTypeID == LE_GARRISON_TYPE_8_0 and RE.GLPR.selectedTab == RE.GLPR.InProgress then
+				local buttons = RE.GLPR.List.listScroll.buttons
+				for i = 1, #buttons do
+					local button = buttons[i]
+					button.BG:SetDesaturated(nil)
+					button.MissionTypeIcon:SetDesaturated(nil)
+					button.Rewards[1].Icon:SetDesaturated(nil)
+					button.Rewards[2].Icon:SetDesaturated(nil)
+				end
+			end
+		end)
+
 		if ElvUI then
 			ElvUI[1]:GetModule("Chat"):AddPluginIcons(ElvUISwag)
 		end
