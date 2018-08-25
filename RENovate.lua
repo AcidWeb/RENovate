@@ -4,7 +4,7 @@ local L = LibStub("AceLocale-3.0"):GetLocale("RENovate")
 local TOAST = LibStub("LibToast-1.0")
 _G.RENovate = RE
 
---GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_8_0, LE_FOLLOWER_TYPE_GARRISON_8_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, ITEM_LEVEL_ABBR, WAR_MISSIONS, WAR_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, HIGHLIGHT_FONT_COLOR, COPPER_PER_GOLD, Fancy18Font, Game13Font, Game13FontShadow
+--GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_8_0, LE_FOLLOWER_TYPE_GARRISON_8_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, WAR_MISSIONS, WAR_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, HIGHLIGHT_FONT_COLOR, COPPER_PER_GOLD, Fancy18Font, Game13Font, Game13FontShadow
 local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
@@ -37,7 +37,7 @@ local ReloadUI = _G.ReloadUI
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 202
+RE.Version = 210
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -49,7 +49,7 @@ RE.UpdateTimer = -1
 RE.PlayerZone = GetCVar("portal")
 SLASH_RENOVATE1 = "/renovate"
 
-RE.DefaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true, ["DisplayMissionCost"] = false, ["CountUnavailableFollowers"] = false, ["BfAWipe"] = false}
+RE.DefaultSettings = {["IgnoredMissions"] = {}, ["ImprovedFollowerPanel"] = true, ["NewMissionNotification"] = true, ["DisplayMissionCost"] = true, ["CountUnavailableFollowers"] = false, ["BfAWipe"] = false}
 RE.AceConfig = {
 	type = "group",
 	args = {
@@ -544,10 +544,6 @@ function RE:MissionUpdate(self)
 				end
 
 				local originalText = (mission.durationSeconds < GARRISON_LONG_MISSION_TIME) and mission.duration or string.format(GARRISON_LONG_MISSION_TIME_FORMAT, mission.duration)
-				local additionalText = ""
-				if RE.Settings.DisplayMissionCost then
-					additionalText = " / |cFFFFFFFF"..mission.cost.."|r |TInterface\\Icons\\INV_Faction_WarResources_Round:0|t"
-				end
 				if mission.offerEndTime then
 					local timeRemaining = mission.offerEndTime - GetTime()
 					local colorCode, colorCodeEnd = "", ""
@@ -556,9 +552,9 @@ function RE:MissionUpdate(self)
 					elseif timeRemaining < 24 * 3600 then
 						colorCode, colorCodeEnd = "|cFFFFFF00", "|r"
 					end
-					button.Summary:SetText(originalText..RE:GetMissonSlowdown(mission.missionID).." / "..colorCode..mission.offerTimeRemaining..colorCodeEnd..additionalText)
+					button.Summary:SetText(originalText..RE:GetMissonSlowdown(mission.missionID).." / "..colorCode..mission.offerTimeRemaining..colorCodeEnd)
 				else
-					button.Summary:SetText(originalText..RE:GetMissonSlowdown(mission.missionID)..additionalText)
+					button.Summary:SetText(originalText..RE:GetMissonSlowdown(mission.missionID))
 				end
 			else
 				button.Overlay.Overlay:SetColorTexture(0, 0, 0, 0.4)
@@ -572,19 +568,21 @@ function RE:MissionUpdate(self)
 			else
 				button.Summary:SetPoint("BOTTOMLEFT", button.Title, "BOTTOMRIGHT", 5, 1)
 			end
-			button.Level:ClearAllPoints()
-			button.Level:SetPoint("CENTER", button, "TOPLEFT", 42, -32)
-			button.RareText:Hide()
-			if mission.isMaxLevel and mission.iLevel > 0 then
-				button.Level:SetText(mission.iLevel)
-				button.ItemLevel:SetText(ITEM_LEVEL_ABBR)
+			if RE.Settings.DisplayMissionCost then
+				button.Level:ClearAllPoints()
+				button.Level:SetPoint("CENTER", button, "TOPLEFT", 42, -32)
+				button.ItemLevel:SetText("|cFFFFFFFF"..mission.cost.."|r |TInterface\\Icons\\INV_Faction_WarResources_Round:0|t")
+				button.ItemLevel:Show()
+			else
+				button.Level:ClearAllPoints()
+				button.Level:SetPoint("CENTER", button, "TOPLEFT", 42, -39)
+				button.ItemLevel:Hide()
 			end
+			button.RareText:Hide()
 			if mission.isRare then
 				button.Level:SetTextColor(0.098, 0.537, 0.969, 1.0)
-				button.ItemLevel:SetTextColor(0.098, 0.537, 0.969, 1.0)
 			else
 				button.Level:SetTextColor(0.84, 0.72, 0.57, 1.0)
-				button.ItemLevel:SetTextColor(0.84, 0.72, 0.57, 1.0)
 			end
 
 			local rewards = RE:GetRewardCache(mission)
