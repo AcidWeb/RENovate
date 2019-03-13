@@ -37,7 +37,7 @@ local ReloadUI = _G.ReloadUI
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 211
+RE.Version = 212
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -513,9 +513,7 @@ function RE:MissionUpdate(self)
 				button:SetScript("OnClick", RE.OnClick)
 				button:SetScript("OnEnter", nil)
 				button:SetScript("OnLeave", nil)
-				if ElvUI then
-					ElvUI[1]:GetModule("Skins"):HandleButton(button)
-				else
+				if not ElvUI then
 					button.Title:SetFontObject(Fancy18Font)
 					button.Summary:SetFontObject(Game13Font)
 				end
@@ -530,6 +528,11 @@ function RE:MissionUpdate(self)
 					button.Threats.Threat[i]:SetPoint(RE.ThreatAnchors[i])
 				end
 			end
+
+			if ElvUI then
+				button.LocBG:Hide()
+			end
+			button.Title:SetText(button.Title:GetText():gsub(L["Treasure Map:"], L["TM:"]))
 
 			if not mission.inProgress then
 				if RE.Settings.IgnoredMissions[mission.missionID] then
