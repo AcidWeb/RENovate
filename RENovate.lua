@@ -4,7 +4,6 @@ local L = LibStub("AceLocale-3.0"):GetLocale("RENovate")
 local TOAST = LibStub("LibToast-1.0")
 _G.RENovate = RE
 
---GLOBALS: SLASH_RENOVATE1, LE_GARRISON_TYPE_8_0, LE_FOLLOWER_TYPE_GARRISON_8_0, GARRISON_LONG_MISSION_TIME, GARRISON_LONG_MISSION_TIME_FORMAT, WAR_MISSIONS, WAR_FOLLOWERS, WINTERGRASP_IN_PROGRESS, GARRISON_MISSION_ADDED_TOAST1, BONUS_ROLL_REWARD_MONEY, XP, ARTIFACT_POWER, OTHER, HIGHLIGHT_FONT_COLOR, COPPER_PER_GOLD, Fancy18Font, Game13Font, Game13FontShadow
 local string, tostring, abs, format, tsort, strcmputf8i, select, pairs, hooksecurefunc, floor, collectgarbage, type, getmetatable, setmetatable = _G.string, _G.tostring, _G.abs, _G.format, _G.table.sort, _G.strcmputf8i, _G.select, _G.pairs, _G.hooksecurefunc, _G.floor, _G.collectgarbage, _G.type, _G.getmetatable, _G.setmetatable
 local GetCVar = _G.GetCVar
 local GetTime = _G.GetTime
@@ -332,12 +331,12 @@ function RE:GetMissionCounteredThreats(followersOrg, enemies, newFollower)
 			local abilities = GetFollowerAbilities(follower.info.followerID)
 			for a = 1, #abilities do
 				for counterID, _ in pairs(abilities[a].counters) do
-					for i = 1, #enemies do
-						local enemy = enemies[i]
+					for j = 1, #enemies do
+						local enemy = enemies[j]
 						for mechanicIndex = 1, #enemy.Mechanics do
-							if not alreadyCountered[i] then alreadyCountered[i] = {} end
-							if counterID == enemy.Mechanics[mechanicIndex].mechanicID and not alreadyCountered[i][mechanicIndex] then
-								alreadyCountered[i][mechanicIndex] = true
+							if not alreadyCountered[j] then alreadyCountered[j] = {} end
+							if counterID == enemy.Mechanics[mechanicIndex].mechanicID and not alreadyCountered[j][mechanicIndex] then
+								alreadyCountered[j][mechanicIndex] = true
 								countered = countered + 1
 							end
 						end
@@ -415,7 +414,7 @@ function RE:PrintNewMission(mission)
 	local rewards = RE:GetRewardCache(RE.MissionCache[mission])
 	for i=1, #rewards do
 		local reward = rewards[i]
-		local link = ""
+		local link
 		if reward.itemID and reward.itemID ~= 0 then
 			link = select(2, GetItemInfo(reward.itemID))
 			if not link then
@@ -462,7 +461,7 @@ function RE:FollowerUpdate(self)
 				button.PortraitFrame.ChanceBG:SetColorTexture(0, 0, 0, 0.75)
 			end
 			if RE.FollowersChanceCache[button.id] and RE:CheckIfFollowerIsFree(button.info) and RE.MissionPage:IsShown() then
-				local status = ""
+				local status
 				if RE.FollowersChanceCache[button.id][3] then
 					status = "|cFF00FF00"
 				else
@@ -524,8 +523,8 @@ function RE:MissionUpdate(self)
 				button.Threats.Threat = {[1] = CreateFrame("Frame", nil, button.Threats, "GarrisonAbilityCounterWithCheckTemplate"),
 				[2] = CreateFrame("Frame", nil, button.Threats, "GarrisonAbilityCounterWithCheckTemplate"),
 				[3] = CreateFrame("Frame", nil, button.Threats, "GarrisonAbilityCounterWithCheckTemplate")}
-				for i = 1, 3 do
-					button.Threats.Threat[i]:SetPoint(RE.ThreatAnchors[i])
+				for j = 1, 3 do
+					button.Threats.Threat[j]:SetPoint(RE.ThreatAnchors[j])
 				end
 			end
 
