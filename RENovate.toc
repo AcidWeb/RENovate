@@ -1,7 +1,7 @@
-## Interface: 80100
+## Interface: 80200
 ## Title: |cFF74D06CRE|rNovate
 ## Notes: Tweak BfA mission table.
-## Version: 2.1.2
+## Version: 2.1.3
 ## Author: AcidWeb
 ## SavedVariablesPerCharacter: RENovateSettings
 ## X-Website: https://www.curseforge.com/wow/addons/renovate-mission-table-extension

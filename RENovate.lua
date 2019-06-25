@@ -36,7 +36,7 @@ local ReloadUI = _G.ReloadUI
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 212
+RE.Version = 213
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
