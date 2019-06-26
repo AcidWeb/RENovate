@@ -36,7 +36,7 @@ local ReloadUI = _G.ReloadUI
 local Timer = _G.C_Timer
 local ElvUI = _G.ElvUI
 
-RE.Version = 213
+RE.Version = 214
 RE.ParsingInProgress = false
 RE.ItemNeeded = false
 RE.ThreatAnchors = {"LEFT", "CENTER", "RIGHT"}
@@ -155,7 +155,7 @@ function RE:OnEvent(self, event, name)
 			toast:SetFormattedTitle("|cFF74D06CRE|r|cFFFFFFFFNovate|r - "..GARRISON_MISSION_ADDED_TOAST1.."!")
 			toast:SetFormattedText(...)
 			toast:SetIconTexture([[Interface\Challenges\challenges-gold]])
-			toast:SetSoundFile([[Sound\Interface\UI_Garrison_CommandTable_Follower_LevelUp3.ogg]])
+			toast:SetSoundFile(1068312)
 		end)
 	elseif event == "ADDON_LOADED" and name == "Blizzard_GarrisonUI" then
 		RE.MF = _G.BFAMissionFrame
